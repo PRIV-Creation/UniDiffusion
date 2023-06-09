@@ -15,7 +15,6 @@
 
 
 import os
-import pkg_resources
 from omegaconf import OmegaConf
 
 from .lazy import LazyConfig
@@ -44,10 +43,5 @@ def get_config(config_path):
     Returns:
         omegaconf.DictConfig: a config object
     """
-    cfg_file = pkg_resources.resource_filename(
-        "diffusion_trainer.config", os.path.join("configs", config_path)
-    )
-    if not os.path.exists(cfg_file):
-        raise RuntimeError("{} not available in detrex configs!".format(config_path))
-    cfg = LazyConfig.load(cfg_file)
+    cfg = LazyConfig.load(os.path.join("configs", config_path))
     return cfg

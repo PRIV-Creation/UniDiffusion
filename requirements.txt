@@ -1,2 +1,4 @@
+cloudpickle
+iopath
 torch
 diffusers[torch]==0.17.0

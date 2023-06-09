@@ -4,7 +4,7 @@ import copy
 from typing import Any, Dict, List, Set, Optional, Callable
 
 
-class Optimizer(torch.optim.optimizer):
+class Optimizer(torch.optim.Optimizer):
     def __init__(self, optimizer="", **kwargs):
         optimizer_map = {
             'sgd': torch.optim.SGD,

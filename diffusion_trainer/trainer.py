@@ -1,3 +1,6 @@
+from diffusion_trainer.config import LazyConfig, instantiate, default_argument_parser
+
+
 class DiffusionTrainer:
     def __init__(self, cfg, training):
         self.cfg = cfg

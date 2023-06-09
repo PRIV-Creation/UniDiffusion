@@ -13,23 +13,14 @@ class Optimizer(torch.optim.optimizer):
         }
         self.optimizer = optimizer_map[optimizer.lower()](**kwargs)
 
-    def __setstate__(self, state: dict):
-        self.optimizer.__setstate__(state)
+    def __getattr__(self, name):
+        return getattr(self.optimizer, name)
 
-    def state_dict(self) -> dict:
-        self.optimizer.state_dict()
-
-    def load_state_dict(self, state_dict: dict):
-        self.optimizer.load_state_dict(state_dict)
-
-    def zero_grad(self, set_to_none: bool):
-        self.optimizer.zero_grad(set_to_none)
-
-    def step(self, closure):
-        self.optimizer.step(closure)
-
-    def add_param_group(self, param_group):
-        self.optimizer.add_param_group(param_group)
+    def __setattr__(self, name, value):
+        if name == 'optimizer':
+            super().__setattr__(name, value)
+        else:
+            setattr(self.optimizer, name, value)
 
 
 def get_default_optimizer_params(
@@ -42,12 +33,9 @@ def get_default_optimizer_params(
     lr_factor_func: Optional[Callable] = None,
     overrides: Optional[Dict[str, Dict[str, float]]] = None,
     num_layers = None,
-    lr_decay_rate = 1.,
     weight_decay_embed = 0.,
     backbone_lr_factor = 1.,
 ):
-    assert lr_decay_rate <= 1.0
-
     defaults = {}
     defaults["lr"] = base_lr
     defaults["weight_decay"] = weight_decay

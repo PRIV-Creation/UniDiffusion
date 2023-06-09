@@ -1,9 +1,9 @@
-from detrex.config import get_config
-from .models.dino_r50 import model
+from diffusion_trainer.config import get_config
+
 
 # get default config
-dataloader = get_config("common/data/coco_vitdet.py").dataloader
+dataloader = get_config("common/data/txt_dataset.py").optimizer
 optimizer = get_config("common/optim.py").optimizer
 
 optimizer.optimizer = "AdamW"
-opitmizer.lr = 2e-7
+optimizer.lr = 2e-7

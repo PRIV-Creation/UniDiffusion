@@ -4,6 +4,7 @@ from diffusion_trainer.config import LazyConfig, instantiate, default_argument_p
 import itertools
 import numpy as np
 import PIL
+from tqdm.auto import tqdm
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -29,6 +30,9 @@ class DiffusionTrainer:
     weight_dtype = None
 
     def __init__(self, cfg, training):
+        self.lr_scheduler = None
+        self.trainable_params = None
+        self.dataloader = None
         self.accelerator = None
         self.optimizer = None
         self.models = None
@@ -38,7 +42,7 @@ class DiffusionTrainer:
         self.default_setup()
         self.build_model()
         if training:
-            self.build_dataset()
+            self.build_dataloader()
             self.build_optimizer()
             self.build_scheduler()
             self.build_evaluator()
@@ -68,8 +72,9 @@ class DiffusionTrainer:
         elif self.accelerator.mixed_precision == "bf16":
             self.weight_dtype = torch.bfloat16
 
-    def build_dataset(self):
-        pass
+    def build_dataloader(self):
+        self.cfg.dataloader.dataset.tokenizer = self.tokenizer
+        self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):
         # update config if load checkpoint
@@ -83,7 +88,7 @@ class DiffusionTrainer:
         self.unet = instantiate(self.cfg.unet)
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
-        self.models = [self.vae, self.tokenizer, self.text_encoder, self.unet]
+        self.models = [self.vae, self.text_encoder, self.unet]
 
     def build_optimizer(self):
         # get trainable parameters
@@ -93,6 +98,7 @@ class DiffusionTrainer:
             if p is not None:
                 trainable_params.append(p)
         trainable_params = itertools.chain(*trainable_params)
+        self.trainable_params = trainable_params  # use for grad clip
 
         # build optimizer
         self.cfg.optimizer.params = trainable_params
@@ -143,8 +149,87 @@ class DiffusionTrainer:
         self.accelerator.register_save_state_pre_hook(save_model_hook)
         self.accelerator.register_load_state_pre_hook(load_model_hook)
 
+    def model_train(self):
+        for model in self.models:
+            if model.trainable:
+                model.train()
+
+    def model_eval(self):
+        for model in self.models:
+            model.eval()
+
     def train(self):
-        pass
+        iteration = 0
+        self.model_train()
+
+        # Only show the progress bar once on each machine.
+        progress_bar = tqdm(range(iteration, self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
+        progress_bar.set_description("Steps")
+
+        accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler
+        optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
+        while iteration < self.cfg.train.max_iter:
+            batch = next(iter(self.dataloader))
+            with accelerator.accumulate(unet):
+                # Convert images to latent space
+                latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
+                latents = latents * vae.config.scaling_factor
+
+                # Sample noise that we'll add to the latents
+                noise = torch.randn_like(latents)
+                bsz = latents.shape[0]
+                # Sample a random timestep for each image
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                timesteps = timesteps.long()
+
+                # Add noise to the latents according to the noise magnitude at each timestep
+                # (this is the forward diffusion process)
+                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+
+                # Get the text embedding for conditioning
+                encoder_hidden_states = text_encoder(batch["input_ids"][:, 0])[0].to(dtype=self.weight_dtype)
+
+                # Predict the noise residual
+                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                # Get the target for loss depending on the prediction type
+                if noise_scheduler.config.prediction_type == "epsilon":
+                    target = noise
+                elif noise_scheduler.config.prediction_type == "v_prediction":
+                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                else:
+                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+
+                loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+
+                accelerator.backward(loss)
+                if accelerator.sync_gradients:
+                    accelerator.clip_grad_norm_(self.trainable_params, self.cfg.train.max_grad_norm)
+
+                optimizer.step()
+                lr_scheduler.step()
+                optimizer.zero_grad()
+
+                if accelerator.sync_gradients:
+                    progress_bar.update(1)
+                    iteration += 1
+                    if accelerator.is_main_process:
+                        if iteration % self.cfg.train.checkpointing_steps == 0:
+                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{iteration}")
+                            accelerator.save_state(save_path)
+                            logger.info(f"Saved state to {save_path}")
+
+                        # Validation
+
+                logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+                progress_bar.set_postfix(**logs)
+                accelerator.log(logs, step=iteration)
+        accelerator.wait_for_everyone()
+        if accelerator.is_main_process:
+            # Save last
+            # ......
+            pass
+        accelerator.end_training()
 
     def inference(self):
         pass

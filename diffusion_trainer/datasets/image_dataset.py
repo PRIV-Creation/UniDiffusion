@@ -10,10 +10,13 @@ class ImageDataset(BaseDataset):
         image_paths,
         tokenizer,
         placeholder,
+        resolution=512,
     ):
         super().__init__()
         self.tokenizer = tokenizer
         self.placeholder = placeholder
+        self.resolution = resolution
+
         self.image_paths = glob.glob(f'{image_paths}/**/*.png', recursive=True)
         self.image_paths.sort()
 
@@ -24,6 +27,7 @@ class ImageDataset(BaseDataset):
         self.image_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.Resize(resolution),
                 transforms.Normalize([0.5], [0.5]),
             ]
         )

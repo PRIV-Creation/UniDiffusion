@@ -2,7 +2,7 @@ from diffusion_trainer.config import get_config
 
 
 # get default config
-dataloader = get_config("common/optim.py").optimizer
+dataloader = get_config("common/data/image_dataset.py").dataloader
 optimizer = get_config("common/optim.py").optimizer
 train = get_config("common/train.py").train
 accelerator = get_config("common/train.py").accelerator

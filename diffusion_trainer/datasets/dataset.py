@@ -2,15 +2,7 @@ from torch.utils.data import Dataset
 
 
 class BaseDataset(Dataset):
-    def __init__(self, cfg):
-        pass
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, item):
-        pass
-
+    pass
 
 class TXTDataset(BaseDataset):
     def __init__(self, cfg):

@@ -13,16 +13,17 @@ from diffusers.training_utils import EMAModel
 from diffusion_trainer.config import LazyCall as L
 
 train = {
-    # accelerate configs
-    'accelerate': {
-        'enabled': True,
-    },
-    # common training configs
+    # common configs
     'output_dir': './output',
     'pretrained_model_name_or_path': '',
     'revision': '',
     'seed': 0,
     'use_xformers': True,
+    # training configs
+    'max_iter': 10000,
+    'max_grad_norm': 1.0,
+    # logging configs
+    'checkpointing_steps': 5000,
     # wandb
     'wandb': {
         'enabled': False,

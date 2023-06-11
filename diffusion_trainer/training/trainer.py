@@ -129,13 +129,14 @@ class DiffusionTrainer:
             self.unet.enable_xformers_memory_efficient_attention()
 
         # prepare tracker
-        if self.accelerator.is_main_process:
+        output_dir = self.cfg.train.output_dir
+        if self.accelerator.is_main_process and self.cfg.train.wandb.enabled:
             wandb_kwargs = {
-                'entity': self.cfg.wandb_entity,
-                'name': os.path.split(self.cfg.output_dir)[-1] if os.path.split(self.cfg.output_dir)[-1] != '' else
-                os.path.split(self.cfg.output_dir)[-2],
+                'entity': self.cfg.train.wandb.entity,
+                'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
+                os.path.split(output_dir)[-2],
             }
-            self.accelerator.init_trackers(self.cfg.wandb.project, config=vars(self.cfg),
+            self.accelerator.init_trackers(self.cfg.train.wandb.project, config=vars(self.cfg),
                                            init_kwargs={'wandb': wandb_kwargs})
 
         # prepare checkpoint hook

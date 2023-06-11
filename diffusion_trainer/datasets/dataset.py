@@ -27,3 +27,20 @@ class TXTDataset(BaseDataset):
 
     def __getitem__(self, item):
         pass
+
+
+class ImageDataset(BaseDataset):
+    def __init__(self, cfg):
+        super(ImageDataset, self).__init__(cfg)
+
+        self.image_path = cfg.image_path
+        self.image_list = self.load_image()
+
+    def load_image(self):
+        pass
+
+    def __len__(self):
+        return len(self.image_list)
+
+    def __getitem__(self, item):
+        pass

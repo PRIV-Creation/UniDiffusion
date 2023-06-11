@@ -8,8 +8,7 @@ from diffusion_trainer.models import (
 )
 
 # set model
-vae = L(AutoencoderKL_DT)(
-    _function_="from_pretrained",
+vae = L(AutoencoderKL_DT.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="vae",
 )

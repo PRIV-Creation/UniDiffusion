@@ -25,6 +25,7 @@ train = {
     'use_xformers': True,
     # wandb
     'wandb': {
+        'enabled': False,
         'project': 'DiffusionTrainer',
         'entity': None,
     },

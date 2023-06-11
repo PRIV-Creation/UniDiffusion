@@ -22,6 +22,12 @@ train = {
     'pretrained_model_name_or_path': '',
     'revision': '',
     'seed': 0,
+    'use_xformers': True,
+    # wandb
+    'wandb': {
+        'project': 'DiffusionTrainer',
+        'entity': None,
+    },
 }
 
 accelerator = L(Accelerator)(

@@ -14,26 +14,22 @@ vae = L(AutoencoderKL_DT)(
     subfolder="vae",
 )
 
-unet = L(UNet2DConditionModel_DT)(
-    _function_="from_pretrained",
+unet = L(UNet2DConditionModel_DT.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="unet",
 )
 
-tokenizer = L(CLIPTokenizer_DT)(
-    _function_="from_pretrained",
+tokenizer = L(CLIPTokenizer_DT.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="tokenizer",
 )
 
-text_encoder = L(CLIPTextModel_DT)(
-    _function_="from_pretrained",
+text_encoder = L(CLIPTextModel_DT.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="text_encoder",
 )
 
-noise_scheduler = L(DDPMScheduler)(
-    _function_="from_pretrained",
+noise_scheduler = L(DDPMScheduler.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="scheduler",
 )

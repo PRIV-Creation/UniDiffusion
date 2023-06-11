@@ -1,24 +1,5 @@
-from diffusion_trainer.config import get_config
-from diffusion_trainer.utils.optim import Optimizer
-from diffusion_trainer.config import LazyCall as L
-from diffusion_trainer.utils.optim import get_default_optimizer_params
-from diffusion_trainer.models import (
-    CLIPTextModel_DT,
-    CLIPTokenizer_DT,
-    UNet2DConditionModel_DT,
-    AutoencoderKL_DT,
-)
+from configs.get_common_config import *
 
-# get default config
-dataloader = get_config("common/data/txt_dataset.py").optimizer
-optimizer = get_config("common/optim.py").optimizer
-train = get_config("common/train.py").train
-accelerator = get_config("common/train.py").accelerator
-vae = get_config("common/model.py").vae
-unet = get_config("common/model.py").unet
-tokenizer = get_config("common/model.py").tokenizer
-text_encoder = get_config("common/model.py").text_encoder
-noise_scheduler = get_config("common/model.py").noise_scheduler
 
 # update configs
 optimizer.optimizer = "AdamW"

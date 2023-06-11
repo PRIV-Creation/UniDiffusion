@@ -28,6 +28,6 @@ accelerator = L(Accelerator)(
     gradient_accumulation_steps=1,
     mixed_precision='fp16',  # "no", "fp16", "bf16"
     log_with='wandb',  # Supported platforms are tensorboard, wandb and comet_ml. Use all to report to all integrations.
-    logging_dir=os.path.join(train['output_dir'], 'logs'),
+    # logging_dir=os.path.join(train['output_dir'], 'logs'),
     project_config=L(ProjectConfiguration)(total_limit=None),
 )

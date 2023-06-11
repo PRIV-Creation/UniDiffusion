@@ -79,10 +79,20 @@ def instantiate(cfg):
                 # target could be anything, so the above could fail
                 cls_name = str(cls)
         assert callable(cls), f"_target_ {cls} does not define a callable object"
-        try:
-            return cls(**cfg)
-        except TypeError:
-            logger = logging.getLogger(__name__)
-            logger.error(f"Error when instantiating {cls_name}!")
-            raise
+
+        if '_function_' in cfg:
+            try:
+                func = getattr(cls, cfg.pop('_function_'))
+                return func(**cfg)
+            except TypeError:
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error when instantiating {cls_name}!")
+                raise
+        else:
+            try:
+                return cls(**cfg)
+            except TypeError:
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error when instantiating {cls_name}!")
+                raise
     return cfg  # return as-is if don't know what to do

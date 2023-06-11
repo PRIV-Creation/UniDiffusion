@@ -1,11 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
+from accelerate.logging import get_logger
 import ast
 import builtins
 import collections.abc as abc
 import importlib
 import inspect
-import logging
 import os
 import uuid
 from contextlib import contextmanager
@@ -309,7 +309,7 @@ class LazyConfig:
             cfg: an omegaconf config object
             filename: yaml file name to save the config file
         """
-        logger = logging.getLogger(__name__)
+        logger = get_logger(__name__)
         try:
             cfg = deepcopy(cfg)
         except Exception:

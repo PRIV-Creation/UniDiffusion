@@ -1,7 +1,5 @@
-from diffusion_trainer.config import get_config
-from diffusion_trainer.utils.optim import Optimizer
+from diffusers import DDPMScheduler
 from diffusion_trainer.config import LazyCall as L
-from diffusion_trainer.utils.optim import get_default_optimizer_params
 from diffusion_trainer.models import (
     CLIPTextModel_DT,
     CLIPTokenizer_DT,
@@ -28,8 +26,14 @@ tokenizer = L(CLIPTokenizer_DT)(
     subfolder="tokenizer",
 )
 
-text_model = L(CLIPTextModel_DT)(
+text_encoder = L(CLIPTextModel_DT)(
     _function_="from_pretrained",
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="text_encoder",
+)
+
+noise_scheduler = L(DDPMScheduler)(
+    _function_="from_pretrained",
+    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
+    subfolder="scheduler",
 )

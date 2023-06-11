@@ -1,9 +1,7 @@
-import logging
 import diffusers
 import os
-from accelerate.logging import get_logger
 from diffusion_trainer.config import LazyConfig, instantiate, default_argument_parser
-
+import itertools
 import numpy as np
 import PIL
 import torch
@@ -29,6 +27,8 @@ class DiffusionTrainer:
     unet_ema = None
 
     def __init__(self, cfg, training):
+        self.optimizer = None
+        self.models = None
         self.cfg = cfg
         self.training = training
 
@@ -43,12 +43,7 @@ class DiffusionTrainer:
 
     def default_setup(self):
         accelerator = instantiate(self.cfg.accelerator)
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-            datefmt="%m/%d/%Y %H:%M:%S",
-            level=logging.INFO,
-        )
-        logger.info(accelerator.state, main_process_only=False)
+        logger.info(accelerator.state, main_process_only=True)
         if accelerator.is_local_main_process:
             transformers.utils.logging.set_verbosity_warning()
             diffusers.utils.logging.set_verbosity_info()
@@ -69,15 +64,32 @@ class DiffusionTrainer:
         # update config if load checkpoint
         # ...
 
-        # tokenizer
+        # build models and noise scheduler
         self.vae = instantiate(self.cfg.vae)
         self.tokenizer = instantiate(self.cfg.tokenizer)
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
         self.text_encoder = instantiate(self.cfg.text_encoder)
         self.unet = instantiate(self.cfg.unet)
+        self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
+
+        self.models = [self.vae, self.tokenizer, self.text_encoder, self.unet]
 
     def build_optimizer(self):
-        pass
+        # get trainable parameters
+        trainable_params = []
+        for model in self.models:
+            p = model.get_trainable_params()
+            if p is not None:
+                trainable_params.append(p)
+        trainable_params = itertools.chain(*trainable_params)
+
+        # build optimizer
+        self.cfg.optimizer.params = trainable_params
+        self.optimizer = instantiate(self.cfg.optimizer)
+
+        # print num of trainable parameters
+        num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group ['params']])
+        logger.info(f"Number of trainable parameters: {num_params / 1e6} M", main_process_only=True)
 
     def build_scheduler(self):
         pass

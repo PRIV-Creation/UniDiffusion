@@ -1,9 +1,22 @@
 import torch
+from accelerate.logging import get_logger
 
 
-class BaseModel(torch.nn.Module):
-    training = False,
-    params_args = dict()
+class BaseModel:
+    trainable = False
+    params_train_args = dict()
 
-    def get_params(self):
-        pass
+    @classmethod
+    def from_pretrained(cls, training_args=None, *args, **kwargs):
+        cls.trainable = training_args is not None
+        cls.params_train_args = training_args
+        get_logger(__name__).info('Model {} trainable: {}.'.format(cls.__name__, cls.trainable))
+        return super().from_pretrained(*args, **kwargs)
+
+    def get_trainable_params(self):
+        if self.trainable:
+            return self.parameters()
+        else:
+            return None
+
+

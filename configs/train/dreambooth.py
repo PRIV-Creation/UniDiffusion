@@ -17,7 +17,8 @@ accelerator = get_config("common/train.py").accelerator
 vae = get_config("common/model.py").vae
 unet = get_config("common/model.py").unet
 tokenizer = get_config("common/model.py").tokenizer
-text_model = get_config("common/model.py").text_model
+text_encoder = get_config("common/model.py").text_encoder
+noise_scheduler = get_config("common/model.py").noise_scheduler
 
 # update configs
 optimizer.optimizer = "AdamW"
@@ -25,3 +26,4 @@ optimizer.lr = 2e-7
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
+unet.training_args = {'*': {'mode': 'finetune'}}

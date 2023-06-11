@@ -13,6 +13,7 @@ from diffusion_trainer.models import (
 dataloader = get_config("common/data/txt_dataset.py").optimizer
 optimizer = get_config("common/optim.py").optimizer
 train = get_config("common/train.py").train
+accelerator = get_config("common/train.py").accelerator
 
 optimizer.optimizer = "AdamW"
 optimizer.lr = 2e-7

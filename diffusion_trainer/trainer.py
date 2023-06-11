@@ -67,10 +67,11 @@ class DiffusionTrainer:
 
     def build_model(self):
         # tokenizer
+        self.vae = instantiate(self.cfg.vae)
         self.tokenizer = instantiate(self.cfg.tokenizer)
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
         self.text_encoder = instantiate(self.cfg.text_encoder)
-        self.vae = instantiate(self.cfg.vae)
+
         self.unet = instantiate(self.cfg.unet)
 
     def build_optimizer(self):

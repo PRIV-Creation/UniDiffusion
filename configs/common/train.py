@@ -22,8 +22,10 @@ train = {
     # training configs
     'max_iter': 10000,
     'max_grad_norm': 1.0,
+    'lr_warmup_iter': 0,
+    'gradient_accumulation_iter': 1,
     # logging configs
-    'checkpointing_steps': 5000,
+    'checkpointing_iter': 5000,
     # wandb
     'wandb': {
         'enabled': False,

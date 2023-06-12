@@ -4,6 +4,7 @@ from diffusion_trainer.config import get_config
 # get default config
 dataloader = get_config("common/data/image_dataset.py").dataloader
 optimizer = get_config("common/optim.py").optimizer
+lr_scheduler = get_config("common/scheduler.py").lr_scheduler
 train = get_config("common/train.py").train
 accelerator = get_config("common/train.py").accelerator
 vae = get_config("common/model.py").vae

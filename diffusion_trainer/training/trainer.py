@@ -30,6 +30,7 @@ class DiffusionTrainer:
     weight_dtype = None
 
     def __init__(self, cfg, training):
+        self.scheduler = None
         self.lr_scheduler = None
         self.trainable_params = None
         self.dataloader = None
@@ -109,7 +110,8 @@ class DiffusionTrainer:
         logger.info(f"Number of trainable parameters: {num_params / 1e6} M", main_process_only=True)
 
     def build_scheduler(self):
-        pass
+        self.cfg.scheduler.optimizer = self.optimizer
+        self.scheduler = instantiate(self.cfg.scheduler)
 
     def build_evaluator(self):
         pass
@@ -214,7 +216,7 @@ class DiffusionTrainer:
                     progress_bar.update(1)
                     iteration += 1
                     if accelerator.is_main_process:
-                        if iteration % self.cfg.train.checkpointing_steps == 0:
+                        if iteration % self.cfg.train.checkpointing_iter == 0:
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{iteration}")
                             accelerator.save_state(save_path)
                             logger.info(f"Saved state to {save_path}")

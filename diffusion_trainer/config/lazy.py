@@ -309,7 +309,7 @@ class LazyConfig:
             cfg: an omegaconf config object
             filename: yaml file name to save the config file
         """
-        logger = get_logger(__name__)
+        logger = get_logger(__name__, log_level="DEBUG")
         try:
             cfg = deepcopy(cfg)
         except Exception:

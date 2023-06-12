@@ -10,7 +10,7 @@ class BaseModel:
     def from_pretrained(cls, training_args=None, *args, **kwargs):
         cls.trainable = training_args is not None
         cls.params_train_args = training_args
-        get_logger(__name__).info('Model {} trainable: {}.'.format(cls.__name__, cls.trainable))
+        get_logger(__name__, log_level="DEBUG").info('Model {} trainable: {}.'.format(cls.__name__, cls.trainable))
         return super().from_pretrained(*args, **kwargs)
 
     def get_trainable_params(self):

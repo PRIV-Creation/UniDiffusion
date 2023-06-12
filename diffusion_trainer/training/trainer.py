@@ -15,9 +15,11 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from huggingface_hub import HfFolder, Repository, create_repo, whoami
 from diffusers.training_utils import EMAModel
 from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
-logger = get_logger(__name__, log_level="INFO")
+logger = get_logger(__name__, log_level="DEBUG")
 
 
 class DiffusionTrainer:

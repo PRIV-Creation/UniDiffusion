@@ -17,7 +17,7 @@ from diffusers.training_utils import EMAModel
 from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
 
 
-logger = get_logger(__name__)
+logger = get_logger(__name__, log_level="INFO")
 
 
 class DiffusionTrainer:
@@ -49,6 +49,7 @@ class DiffusionTrainer:
             self.build_evaluator()
             self.build_criterion()
             self.prepare_training()
+            self.print_training_state()
 
     def default_setup(self):
         self.accelerator = instantiate(self.cfg.accelerator)
@@ -149,6 +150,16 @@ class DiffusionTrainer:
         # prepare checkpoint hook
         self.accelerator.register_save_state_pre_hook(save_model_hook)
         self.accelerator.register_load_state_pre_hook(load_model_hook)
+
+    def print_training_state(self):
+        total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
+        logger.info("***** Running training *****")
+        logger.info(f"  Num examples = {len(self.dataloader.dataset)}")
+        logger.info(f"  Num batches each epoch = {len(self.dataloader)}")
+        logger.info(f"  Num iterations = {self.cfg.train.max_iter}")
+        logger.info(f"  Instantaneous batch size per device = {self.cfg.dataloader.batch_size}")
+        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+        logger.info(f"  Gradient Accumulation steps = {self.cfg.train.gradient_accumulation_iter}")
 
     def model_train(self):
         for model in self.models:

@@ -2,7 +2,7 @@ from configs.get_common_config import *
 
 
 # update configs
-optimizer.optimizer = "AdamW"
+optimizer.optimizer = "SGD"
 optimizer.lr = 2e-7
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'

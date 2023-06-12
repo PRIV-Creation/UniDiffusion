@@ -125,17 +125,13 @@ class DiffusionTrainer:
     def prepare_training(self):
         # prepare models
         for model in self.models:
-            model = self.accelerator.prepare(model)
-        if not self.vae.trainable:
-            self.vae.requires_grad_(False)
-            self.vae.to(self.accelerator.device, dtype=self.weight_dtype)
-        if not self.unet.trainable:
-            self.unet.requires_grad_(False)
-            self.unet.to(self.accelerator.device, dtype=self.weight_dtype)
-        if not self.text_encoder.trainable:
-            self.unet.requires_grad_(False)
+            if model.trainable:
+                model = self.accelerator.prepare(model)
+            else:
+                model.requires_grad_(False)
+                model.to(self.accelerator.device, dtype=self.weight_dtype)
 
-        # prepare xformers
+        # prepare xformers for unet
         if self.cfg.train.use_xformers and self.unet.trainable:
             self.unet.enable_xformers_memory_efficient_attention()
 

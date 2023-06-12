@@ -15,11 +15,7 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from huggingface_hub import HfFolder, Repository, create_repo, whoami
 from diffusers.training_utils import EMAModel
 from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
-import logging
-
-logging.basicConfig(level=logging.INFO)
-
-logger = get_logger(__name__, log_level="DEBUG")
+from diffusion_trainer.utils.logger import setup_logger
 
 
 class DiffusionTrainer:
@@ -30,15 +26,16 @@ class DiffusionTrainer:
     unet = None
     unet_ema = None
     weight_dtype = None
+    logger = None
+    scheduler = None
+    lr_scheduler = None
+    trainable_params = None
+    dataloader = None
+    accelerator = None
+    optimizer = None
+    models = None
 
     def __init__(self, cfg, training):
-        self.scheduler = None
-        self.lr_scheduler = None
-        self.trainable_params = None
-        self.dataloader = None
-        self.accelerator = None
-        self.optimizer = None
-        self.models = None
         self.cfg = cfg
         self.training = training
 
@@ -55,7 +52,9 @@ class DiffusionTrainer:
 
     def default_setup(self):
         self.accelerator = instantiate(self.cfg.accelerator)
-        logger.info(self.accelerator.state, main_process_only=True)
+        self.logger = setup_logger(name=__name__, distributed_rank=self.accelerator.process_index)
+
+        self.logger.info(self.accelerator.state)
         if self.accelerator.is_local_main_process:
             transformers.utils.logging.set_verbosity_warning()
             diffusers.utils.logging.set_verbosity_info()
@@ -110,7 +109,7 @@ class DiffusionTrainer:
 
         # print num of trainable parameters
         num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group ['params']])
-        logger.info(f"Number of trainable parameters: {num_params / 1e6} M", main_process_only=True)
+        self.logger.info(f"Number of trainable parameters: {num_params / 1e6} M")
 
     def build_scheduler(self):
         self.cfg.lr_scheduler.optimizer = self.optimizer
@@ -155,13 +154,13 @@ class DiffusionTrainer:
 
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
-        logger.info("***** Running training *****")
-        logger.info(f"  Num examples = {len(self.dataloader.dataset)}")
-        logger.info(f"  Num batches each epoch = {len(self.dataloader)}")
-        logger.info(f"  Num iterations = {self.cfg.train.max_iter}")
-        logger.info(f"  Instantaneous batch size per device = {self.cfg.dataloader.batch_size}")
-        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
-        logger.info(f"  Gradient Accumulation steps = {self.cfg.train.gradient_accumulation_iter}")
+        self.logger.info("***** Running training *****")
+        self.logger.info(f"  Num examples = {len(self.dataloader.dataset)}")
+        self.logger.info(f"  Num batches each epoch = {len(self.dataloader)}")
+        self.logger.info(f"  Num iterations = {self.cfg.train.max_iter}")
+        self.logger.info(f"  Instantaneous batch size per device = {self.cfg.dataloader.batch_size}")
+        self.logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+        self.logger.info(f"  Gradient Accumulation steps = {self.cfg.train.gradient_accumulation_iter}")
 
     def model_train(self):
         for model in self.models:
@@ -231,7 +230,7 @@ class DiffusionTrainer:
                         if iteration % self.cfg.train.checkpointing_iter == 0:
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{iteration}")
                             accelerator.save_state(save_path)
-                            logger.info(f"Saved state to {save_path}")
+                            self.logger.info(f"Saved state to {save_path}")
 
                         # Validation
 

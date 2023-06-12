@@ -16,7 +16,7 @@ class _ColorfulFormatter(logging.Formatter):
         super(_ColorfulFormatter, self).__init__(*args, **kwargs)
 
     def formatMessage(self, record):
-        record.name = record.name.replace(self._root_name, self._abbrev_name)
+        # record.name = record.name.replace(self._root_name, self._abbrev_name)
         log = super(_ColorfulFormatter, self).formatMessage(record)
         if record.levelno == logging.WARNING:
             prefix = colored("WARNING", "red", attrs=["blink"])
@@ -56,6 +56,7 @@ def setup_logger(
     plain_formatter = logging.Formatter(
         "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
     )
+
     # stdout logging: master only
     if distributed_rank == 0:
         ch = logging.StreamHandler(stream=sys.stdout)
@@ -65,7 +66,7 @@ def setup_logger(
                 colored("[%(asctime)s %(name)s]: ", "green") + "%(message)s",
                 datefmt="%m/%d %H:%M:%S",
                 root_name=name,
-                abbrev_name=str(abbrev_name),
+                # abbrev_name=str(abbrev_name),
             )
         else:
             formatter = plain_formatter

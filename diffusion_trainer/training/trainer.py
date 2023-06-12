@@ -110,8 +110,11 @@ class DiffusionTrainer:
         logger.info(f"Number of trainable parameters: {num_params / 1e6} M", main_process_only=True)
 
     def build_scheduler(self):
-        self.cfg.scheduler.optimizer = self.optimizer
-        self.scheduler = instantiate(self.cfg.scheduler)
+        self.cfg.lr_scheduler.optimizer = self.optimizer
+        self.cfg.lr_scheduler.num_warmup_steps = self.cfg.train.lr_warmup_iter * self.cfg.train.gradient_accumulation_iter
+        self.cfg.lr_scheduler.num_training_steps = self.cfg.train.max_iter * self.cfg.train.gradient_accumulation_iter
+
+        self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
 
     def build_evaluator(self):
         pass

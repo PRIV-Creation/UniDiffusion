@@ -11,6 +11,7 @@ from accelerate.utils import set_seed
 from diffusers.training_utils import EMAModel
 from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
 from diffusion_trainer.utils.logger import setup_logger
+from diffusion_trainer.utils.snr import snr_loss
 
 
 class DiffusionTrainer:
@@ -245,7 +246,10 @@ class DiffusionTrainer:
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-                loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+                if self.cfg.train.snr.enabled:
+                    loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
+                else:
+                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
@@ -260,7 +264,7 @@ class DiffusionTrainer:
                     self.current_iter += 1
                     if accelerator.is_main_process:
                         if self.current_iter % self.cfg.train.checkpointing_iter == 0:
-                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{iteration}")
+                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter}")
                             accelerator.save_state(save_path)
                             self.logger.info(f"Saved state to {save_path}")
 

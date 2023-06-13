@@ -35,6 +35,8 @@ train = {
         'project': 'DiffusionTrainer',
         'entity': None,
     },
+    # training mechanisms
+    'snr': {'enabled': False, 'snr_gamma': 5.0}
 }
 
 accelerator = L(Accelerator)(

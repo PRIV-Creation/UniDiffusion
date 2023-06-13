@@ -1,6 +1,6 @@
 from diffusers import DDPMScheduler
-from diffusion_trainer.config import LazyCall as L
-from diffusion_trainer.models import (
+from unidiffusion.config import LazyCall as L
+from unidiffusion.models import (
     CLIPTextModel_DT,
     CLIPTokenizer_DT,
     UNet2DConditionModel_DT,

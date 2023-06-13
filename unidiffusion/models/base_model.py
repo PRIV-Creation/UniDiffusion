@@ -1,4 +1,4 @@
-from diffusion_trainer.utils.logger import setup_logger
+from unidiffusion.utils.logger import setup_logger
 
 
 class BaseModel:

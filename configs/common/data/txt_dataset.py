@@ -1,6 +1,6 @@
-from diffusion_trainer.utils.optim import Optimizer
-from diffusion_trainer.config import LazyCall as L
-from diffusion_trainer.utils.optim import get_default_optimizer_params
+from unidiffusion.utils.optim import Optimizer
+from unidiffusion.config import LazyCall as L
+from unidiffusion.utils.optim import get_default_optimizer_params
 
 
 optimizer = L(Optimizer)(

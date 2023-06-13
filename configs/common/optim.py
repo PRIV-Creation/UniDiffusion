@@ -1,5 +1,5 @@
-from diffusion_trainer.utils.optim import get_optimizer
-from diffusion_trainer.config import LazyCall as L
+from unidiffusion.utils.optim import get_optimizer
+from unidiffusion.config import LazyCall as L
 
 
 optimizer = L(get_optimizer)(

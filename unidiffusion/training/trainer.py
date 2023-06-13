@@ -1,6 +1,6 @@
 import diffusers
 import os
-from diffusion_trainer.config import instantiate
+from unidiffusion.config import instantiate
 import itertools
 from tqdm.auto import tqdm
 import torch
@@ -9,9 +9,9 @@ import torch.utils.checkpoint
 import transformers
 from accelerate.utils import set_seed
 from diffusers.training_utils import EMAModel
-from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
-from diffusion_trainer.utils.logger import setup_logger
-from diffusion_trainer.utils.snr import snr_loss
+from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
+from unidiffusion.utils.logger import setup_logger
+from unidiffusion.utils.snr import snr_loss
 
 
 class DiffusionTrainer:

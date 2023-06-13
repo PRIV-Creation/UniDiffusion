@@ -1,5 +1,5 @@
-from diffusion_trainer.training.trainer import DiffusionTrainer
-from diffusion_trainer.config import LazyConfig, default_argument_parser
+from unidiffusion.training.trainer import DiffusionTrainer
+from unidiffusion.config import LazyConfig, default_argument_parser
 
 
 def main(cfg):

@@ -1,4 +1,4 @@
-from diffusion_trainer.config import get_config
+from unidiffusion.config import get_config
 
 
 # get default config

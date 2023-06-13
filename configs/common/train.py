@@ -10,7 +10,7 @@ from accelerate.logging import get_logger
 from accelerate.utils import ProjectConfiguration, set_seed
 from huggingface_hub import HfFolder, Repository, create_repo, whoami
 from diffusers.training_utils import EMAModel
-from diffusion_trainer.config import LazyCall as L
+from unidiffusion.config import LazyCall as L
 
 train = {
     # common configs

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name="diffusion_trainer",
+    name="unidiffusion",
     version="0.1",
     packages=find_packages(),
     author="PRIV-Creation",
@@ -10,5 +10,5 @@ setup(
     description="Diffusion training toolbox.",
     license="Apache",
     keywords="diffusion",
-    url="https://github.com/PRIV-Creation/DiffusionTrainer",   # project home page, if any
+    url="https://github.com/PRIV-Creation/UniDiffusion",   # project home page, if any
 )

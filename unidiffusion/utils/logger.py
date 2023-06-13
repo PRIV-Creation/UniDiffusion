@@ -3,7 +3,7 @@ import os
 import sys
 import logging
 from termcolor import colored
-from diffusion_trainer.utils.file_io import PathManager
+from unidiffusion.utils.file_io import PathManager
 import atexit
 
 

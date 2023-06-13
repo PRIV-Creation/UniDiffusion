@@ -1,7 +1,7 @@
 import torch
-from diffusion_trainer.datasets import ImageDataset
-from diffusion_trainer.config import LazyCall as L
-from diffusion_trainer.utils.dataloader import collate_fn
+from unidiffusion.datasets import ImageDataset
+from unidiffusion.config import LazyCall as L
+from unidiffusion.utils.dataloader import collate_fn
 
 
 dataloader = L(torch.utils.data.DataLoader)(

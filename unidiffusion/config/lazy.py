@@ -18,7 +18,7 @@ from typing import Any
 from omegaconf import DictConfig, ListConfig, OmegaConf, SCMode
 import pydoc
 
-from diffusion_trainer.utils.file_io import PathManager
+from unidiffusion.utils.file_io import PathManager
 
 __all__ = ["LazyCall", "LazyConfig"]
 

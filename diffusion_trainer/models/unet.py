@@ -42,17 +42,22 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                 proxy_layer = LoRALinearLayer(origin_layer, **proxy_layer_kwargs)
             elif nn_module_name == 'Conv2d':
                 proxy_layer = LoRAConvLayer(origin_layer, **proxy_layer_kwargs)
-            self.trainable_params.extend(proxy_layer.get_trainable_parameters())
             return proxy_layer
         
         
     def get_all_proxy_layers(self):
         return self.named_proxy_modules
 
+    def enumerate_params(params_gen, lr: float):
+        params = []
+        for param in params_gen:
+            params.append({'params': param, 'lr': lr})
+        return params
 
     def get_trainable_params(self):
         self.requires_grad_(False)
         self.parse_training_args()
+        
         for name, module in self.named_modules():
             # for target_module, target_replace_layer, method in zip(self.target_modules, self.target_replace_layers, self.methods):
             module_name = module.__class__.__name__
@@ -60,13 +65,20 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                 target_replace_layer = self.target_replace_layers[self.target_modules.index(module_name)]
                 method = self.methods[self.target_modules.index(module_name)]
                 mode = method['mode']
-                proxy_layer_kwargs = method['extra_args']
+                proxy_layer_kwargs = method['layer_kwargs']
+                lr = method['lr']
                 for layer_name, layer in module.named_modules():
                     proxy_layer = self.set_proxy_layer(layer_name, layer, target_replace_layer, mode, proxy_layer_kwargs)
                     if proxy_layer is not None:
                         module.__setattr__(layer_name, proxy_layer)
+                        self.trainable_params.extend(
+                            self.enumerate_params(proxy_layer.get_trainable_parameters(), lr)
+                        )
                         self.named_proxy_modules.update({f'{name}.{layer_name}.{proxy_layer.proxy_name}': proxy_layer})
         # for name, params in self.named_parameters():
         #     if params.requires_grad:
         #         print(name)
+        
+        # turn self.trainable_params into a generator
+        # self.trainable_params = iter(self.trainable_params)
         return self.trainable_params

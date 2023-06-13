@@ -68,7 +68,7 @@ pip install -e requirements.txt
 ## Citation
 If you use this toolbox in your research or wish to refer to the baseline results published here, please use the following BibTeX entries:
 
-- Citing **detrex**:
+- Citing **DiffusionEverything**:
 
 ```BibTeX
 @misc{priv2022diffusion,

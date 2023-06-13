@@ -1,18 +1,13 @@
 import diffusers
 import os
-from diffusion_trainer.config import LazyConfig, instantiate, default_argument_parser
+from diffusion_trainer.config import instantiate
 import itertools
-import numpy as np
-import PIL
 from tqdm.auto import tqdm
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
-from accelerate import Accelerator
-from accelerate.logging import get_logger
-from accelerate.utils import ProjectConfiguration, set_seed
-from huggingface_hub import HfFolder, Repository, create_repo, whoami
+from accelerate.utils import set_seed
 from diffusers.training_utils import EMAModel
 from diffusion_trainer.utils.checkpoint import save_model_hook, load_model_hook
 from diffusion_trainer.utils.logger import setup_logger

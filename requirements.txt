@@ -2,4 +2,13 @@ cloudpickle
 iopath
 termcolor
 torch
-diffusers[torch]==0.17.0
+diffusers[torch]
+numpy
+Pillow
+transformers
+accelerate
+setuptools
+PyYAML
+omegaconf
+torchvision
+tqdm

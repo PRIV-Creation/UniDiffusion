@@ -1,5 +1,3 @@
-import os
-import torch
 from diffusion_trainer.utils.logger import setup_logger
 
 

@@ -3,6 +3,8 @@
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.0.0-blue.svg)](https://pytorch.org/)
 
+Easily conducting the **Uni**versity of Diffusion based on **Uni**fied pipeline.
+
 ## Introduction
 UniDiffusion is a toolbox that provides state-of-the-art training and inference algorithms, based on diffusers.
 
@@ -71,9 +73,9 @@ If you use this toolbox in your research or wish to refer to the baseline result
 
 ```BibTeX
 @misc{priv2022diffusion,
-  author =       {diffusion trainer contributors},
-  title =        {Diffusion Trainer},
-  howpublished = {\url{}},
+  author =       {Pu Cao, Tianrui Huang, Lu Yang, Qing Song},
+  title =        {UniDiffusion},
+  howpublished = {\url{https://github.com/PRIV-Creation/UniDiffusion}},
   year =         {2023}
 }
 ```

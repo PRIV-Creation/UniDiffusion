@@ -3,4 +3,9 @@ from transformers import CLIPTextModel
 
 
 class CLIPTextModel_DT(BaseModel, CLIPTextModel):
-    pass
+    TEXT_ENCODER_TARGET_REPLACE_MODULE = ["CLIPAttention", "CLIPMLP"]
+    
+    def check_validate(self):
+        pass
+
+    

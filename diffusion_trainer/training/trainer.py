@@ -34,13 +34,16 @@ class DiffusionTrainer:
     accelerator = None
     optimizer = None
     models = None
-
+    current_iter = 0
+    
     def __init__(self, cfg, training):
+        self.ema_unet = None
         self.cfg = cfg
         self.training = training
 
         self.default_setup()
         self.build_model()
+        self.load_checkpoint()
         if training:
             self.build_dataloader()
             self.build_optimizer()
@@ -80,9 +83,6 @@ class DiffusionTrainer:
         self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):
-        # update config if load checkpoint
-        # ...
-
         # build models and noise scheduler
         self.vae = instantiate(self.cfg.vae)
         self.tokenizer = instantiate(self.cfg.tokenizer)
@@ -92,6 +92,37 @@ class DiffusionTrainer:
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
         self.models = [self.vae, self.text_encoder, self.unet]
+        
+        # EMA
+        if self.cfg.train.use_ema:
+            self.ema_unet = EMAModel(self.unet, model_cls=type(self.unet), model_config=self.unet.config)
+        else:
+            self.ema_unet = None
+            
+    def load_checkpoint(self):
+        if self.cfg.train.resume is not None:
+            if self.cfg.train.resume != "latest":
+                path = os.path.basename(self.cfg.train.resume)
+            else:
+                # Get the mos recent checkpoint
+                dirs = os.listdir(self.cfg.train.output_dir)
+                dirs = [d for d in dirs if d.startswith("checkpoint")]
+                dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
+                path = dirs[-1] if len(dirs) > 0 else None
+
+            if path is None:
+                self.logger.warn(
+                    f"Checkpoint '{self.cfg.train.resume}' does not exist. Starting a new training run."
+                )
+                self.cfg.train.resume = None
+            else:
+                self.logger.info(f"Resuming from checkpoint {path}")
+                self.accelerator.load_state(os.path.join(self.cfg.train.output_dir, path))
+                current_iter = int(path.split("-")[1])
+                self.current_iter = current_iter * self.cfg.train.gradient_accumulation_iter
+
+        # Load tokenizer
+        # .......
 
     def build_optimizer(self):
         # get trainable parameters
@@ -137,6 +168,13 @@ class DiffusionTrainer:
         if self.cfg.train.use_xformers and self.unet.trainable:
             self.unet.enable_xformers_memory_efficient_attention()
 
+        # prepare gradient checkpointing
+        if self.cfg.train.gradient_checkpointing:
+            if self.unet.trainable:
+                self.unet.enable_gradient_checkpointing()
+            if self.text_encoder.trainable:
+                self.text_encoder.gradient_checkpointing_enable()
+
         # prepare tracker
         output_dir = self.cfg.train.output_dir
         if self.accelerator.is_main_process and self.cfg.train.wandb.enabled:
@@ -172,16 +210,15 @@ class DiffusionTrainer:
             model.eval()
 
     def train(self):
-        iteration = 0
         self.model_train()
 
         # Only show the progress bar once on each machine.
-        progress_bar = tqdm(range(iteration, self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
+        progress_bar = tqdm(range(self.current_iter, self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
         progress_bar.set_description("Steps")
 
         accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler
         optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
-        while iteration < self.cfg.train.max_iter:
+        while self.current_iter < self.cfg.train.max_iter:
             batch = next(iter(self.dataloader))
             with accelerator.accumulate(unet):
                 # Convert images to latent space
@@ -225,18 +262,19 @@ class DiffusionTrainer:
 
                 if accelerator.sync_gradients:
                     progress_bar.update(1)
-                    iteration += 1
+                    self.current_iter += 1
                     if accelerator.is_main_process:
-                        if iteration % self.cfg.train.checkpointing_iter == 0:
+                        if self.current_iter % self.cfg.train.checkpointing_iter == 0:
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{iteration}")
                             accelerator.save_state(save_path)
                             self.logger.info(f"Saved state to {save_path}")
 
                         # Validation
-
+                        # -------
+                        
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
-                accelerator.log(logs, step=iteration)
+                accelerator.log(logs, step=self.current_iter)
         accelerator.wait_for_everyone()
         if accelerator.is_main_process:
             # Save last

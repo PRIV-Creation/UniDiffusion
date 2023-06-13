@@ -13,6 +13,8 @@ UniDiffusion is built to solve:
 - Easy to use, easy to customize, easy to combine, and easy to extend.
 - Clean and readable codebase.
 
+**Note:** UniDiffusion is still under development. Some modules are borrowed from other code repositories and have not been tested yet, especially the components that are not enabled by default in the configuration system. We are working hard to improve this project.
+
 ## Features
 - *Decomposing Training Methods*. UniDiffusion decomposes methods into three dimension: trainable parameters, peft method, and training process. This process facilitates greater ease in the combination and enhancement of the method.
 - *Modular Design*. UniDiffusion is designed with a modular architecture. The modular design enables easy implementation of new methods. 

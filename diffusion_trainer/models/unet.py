@@ -1,7 +1,7 @@
 from typing import Union
 from .base_model import BaseModel
 from diffusers import UNet2DConditionModel
-from ..peft.lora import LoRALinearLayer, LoRAConvLayer
+from ..peft.lora import replace_lora_layer
 import torch.nn as nn
 
 class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
@@ -26,23 +26,21 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
 
 
     def set_proxy_layer(self, 
-                        layer_name,
                         origin_layer: nn.Module,
                         target_replace_layer: str,
                         mode: str,
                         proxy_layer_kwargs: dict = None,
                         ):
-        nn_module_name = origin_layer.__class__.__name__
         if mode == 'finetune':
+            origin_layer.requires_grad_(True)
             return origin_layer
         elif mode == 'lora':
-            if nn_module_name != target_replace_layer:
-                return
-            if nn_module_name == 'Linear':
-                proxy_layer = LoRALinearLayer(origin_layer, **proxy_layer_kwargs)
-            elif nn_module_name == 'Conv2d':
-                proxy_layer = LoRAConvLayer(origin_layer, **proxy_layer_kwargs)
-            return proxy_layer
+            if origin_layer != target_replace_layer:
+                return 
+            else: 
+                return replace_lora_layer(origin_layer, **proxy_layer_kwargs)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
         
         
     def get_all_proxy_layers(self):
@@ -68,7 +66,7 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                 proxy_layer_kwargs = method['layer_kwargs']
                 lr = method['lr']
                 for layer_name, layer in module.named_modules():
-                    proxy_layer = self.set_proxy_layer(layer_name, layer, target_replace_layer, mode, proxy_layer_kwargs)
+                    proxy_layer = self.set_proxy_layer(layer, target_replace_layer, mode, proxy_layer_kwargs)
                     if proxy_layer is not None:
                         module.__setattr__(layer_name, proxy_layer)
                         self.trainable_params.extend(

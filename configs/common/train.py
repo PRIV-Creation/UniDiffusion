@@ -19,6 +19,9 @@ train = {
     'revision': '',
     'seed': 0,
     'use_xformers': True,
+    'gradient_checkpointing': False,
+    'resume': None,  # "latest" | checkpoint path
+    'use_ema': True,
     # training configs
     'max_iter': 10000,
     'max_grad_norm': 1.0,

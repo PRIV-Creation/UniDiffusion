@@ -15,7 +15,11 @@ class BaseModel:
     def get_trainable_params(self):
         if self.trainable:
             return self.parameters()
-        else:
+        else: 
             return None
 
+    def set_proxy_layer(self):
+        return NotImplementedError()
 
+    def get_all_proxy_layers(self):
+        return NotImplementedError()

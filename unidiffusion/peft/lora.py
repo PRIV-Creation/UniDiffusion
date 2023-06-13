@@ -5,7 +5,8 @@ import torch.nn.functional as F
 # from peft.proxy import BaseProxy
 
 class BaseLoRAModule(nn.Module):
-    proxy_name:str
+    proxy_name: str
+    target_replace_layer: str
 
     def __init__(self, org_module: nn.Module, **kwargs) -> None:
         super().__init__()
@@ -30,6 +31,7 @@ class BaseLoRAModule(nn.Module):
 
 class LoRALinearLayer(BaseLoRAModule):
     proxy_name = 'lora'
+    target_replace_layer = 'Linear'
 
     def __init__(self, org_module, rank=4, network_alpha=None, multiplier=1.0):
         super().__init__(org_module)
@@ -71,6 +73,7 @@ class LoRALinearLayer(BaseLoRAModule):
 
 class LoRAConvLayer(BaseLoRAModule):
     proxy_name = 'lora_conv'
+    target_replace_layer = 'Conv2d'
 
     def __init__(self, org_module: nn.Module, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
         assert isinstance(org_module, nn.Conv2d)
@@ -125,3 +128,11 @@ class LoRAConvLayer(BaseLoRAModule):
             return self.org_forward(x)  + self.dropout(
                 self.lora_up(self.lora_down(x))* self.multiplier * self.scale
             )
+        
+def replace_lora_layer(org_module, **layer_kwargs):
+    if isinstance(org_module, nn.Linear):
+        return LoRALinearLayer(org_module, **layer_kwargs)
+    elif isinstance(org_module, nn.Conv2d):
+        return LoRAConvLayer(org_module, **layer_kwargs)
+    else:
+        raise ValueError(f"LoRA does not support {type(org_module)}")

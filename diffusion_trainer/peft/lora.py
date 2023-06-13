@@ -2,17 +2,40 @@ import torch
 import torch.nn as nn
 import math
 import torch.nn.functional as F
+# from peft.proxy import BaseProxy
 
-class LoRALinearLayer(nn.Module):
+class BaseLoRAModule(nn.Module):
+    proxy_name:str
+
+    def __init__(self, org_module: nn.Module, **kwargs) -> None:
+        super().__init__()
+        self.org_module = org_module
+    
+    def apply_to(self):
+        self.org_forward = self.org_module.forward
+
+    def set_trainable(self):
+        self.requires_grad_(True)
+        self.org_module.requires_grad_(False)
+
+    def get_trainable_parameters(self):
+        for name, params in self.named_parameters():
+            if params.requires_grad:
+                yield params
+    
+    def named_trainabl_parameters(self):
+        for name, params in self.named_parameters():
+            if params.requires_grad:
+                yield name, params
+
+class LoRALinearLayer(BaseLoRAModule):
     proxy_name = 'lora'
 
     def __init__(self, org_module, rank=4, network_alpha=None, multiplier=1.0):
-        super().__init__()
+        super().__init__(org_module)
 
         in_features = org_module.in_features
         out_features = org_module.out_features
-        self.org_linear = org_module
-        
         if rank > min(in_features, out_features):
             raise ValueError(f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}")
 
@@ -28,13 +51,10 @@ class LoRALinearLayer(nn.Module):
         nn.init.normal_(self.down.weight, std=1 / rank)
         nn.init.zeros_(self.up.weight)
 
-        # self.magic()
-        self.org_forward = self.org_linear.forward
+        # control what params to be grad-enabled
+        self.set_trainable()
+        self.apply_to()
     
-    def magic(self):
-        self.org_forward = self.org_linear.forward
-        # self.org_linear.forward = self.forward
-        # del self.org_linear
 
     def forward(self, hidden_states):
         orig_dtype = hidden_states.dtype
@@ -49,14 +69,12 @@ class LoRALinearLayer(nn.Module):
         return up_hidden_states.to(orig_dtype) * self.scale * self.multiplier + self.org_forward(hidden_states)
 
 
-class LoRAConvLayer(nn.Module):
+class LoRAConvLayer(BaseLoRAModule):
     proxy_name = 'lora_conv'
 
     def __init__(self, org_module: nn.Module, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
-        super().__init__()
-        
         assert isinstance(org_module, nn.Conv2d)
-
+        super().__init__(org_module)
         in_dim = org_module.in_channels
         k_size = org_module.kernel_size
         stride = org_module.stride
@@ -68,6 +86,7 @@ class LoRAConvLayer(nn.Module):
             self.cp = True
         else:
             self.lora_down = nn.Conv2d(in_dim, rank, k_size, stride, padding, bias=False)
+            self.cp = False
         self.lora_up = nn.Conv2d(rank, out_dim, (1, 1), bias=False)
         self.shape = org_module.weight.shape
         
@@ -87,14 +106,10 @@ class LoRAConvLayer(nn.Module):
         torch.nn.init.zeros_(self.lora_up.weight)
         if self.cp:
             torch.nn.init.kaiming_uniform_(self.lora_mid.weight, a=math.sqrt(5))
-
         self.multiplier = multiplier
-        self.org_module = org_module
+
+        self.set_trainable()
         self.apply_to()
-
-    def apply_to(self):
-        self.org_forward = self.org_module.forward
-
 
     def make_weight(self):
         wa = self.lora_up.weight

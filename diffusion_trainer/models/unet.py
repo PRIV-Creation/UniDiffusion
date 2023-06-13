@@ -8,6 +8,9 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
 
     UNET_TARGET_REPLACE_MODULE = ["Transformer2DModel", "Attention"]
     UNET_TARGET_REPLACE_MODULE_CONV2D_3X3 = ["ResnetBlock2D", "Downsample2D", "Upsample2D"]
+    
+    def check_validate(self):
+        pass
 
     def parse_training_args(self):
         # "*.Linear": {"mode": "lora", "network_alpha": 0.1, "rank": 4, "bias": False}
@@ -39,8 +42,7 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                 proxy_layer = LoRALinearLayer(origin_layer, **proxy_layer_kwargs)
             elif nn_module_name == 'Conv2d':
                 proxy_layer = LoRAConvLayer(origin_layer, **proxy_layer_kwargs)
-            proxy_layer.requires_grad_(True)
-            self.trainable_params.extend([v for _, v in proxy_layer.named_parameters()])
+            self.trainable_params.extend(proxy_layer.get_trainable_parameters())
             return proxy_layer
         
         
@@ -64,9 +66,7 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                     if proxy_layer is not None:
                         module.__setattr__(layer_name, proxy_layer)
                         self.named_proxy_modules.update({f'{name}.{layer_name}.{proxy_layer.proxy_name}': proxy_layer})
-        for name, params in self.named_parameters():
-            if params.requires_grad:
-                print(name)
-        for name, proxy_layer in self.named_proxy_modules.items():
-            print(name)
-        return params
+        # for name, params in self.named_parameters():
+        #     if params.requires_grad:
+        #         print(name)
+        return self.trainable_params

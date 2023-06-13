@@ -16,7 +16,7 @@ class _ColorfulFormatter(logging.Formatter):
         super(_ColorfulFormatter, self).__init__(*args, **kwargs)
 
     def formatMessage(self, record):
-        # record.name = record.name.replace(self._root_name, self._abbrev_name)
+        record.name = record.name.replace(self._root_name, self._abbrev_name)
         log = super(_ColorfulFormatter, self).formatMessage(record)
         if record.levelno == logging.WARNING:
             prefix = colored("WARNING", "red", attrs=["blink"])
@@ -28,7 +28,7 @@ class _ColorfulFormatter(logging.Formatter):
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
 def setup_logger(
-    output=None, distributed_rank=0, *, color=True, name="detectron2", abbrev_name=None
+    output=None, distributed_rank=None, *, color=True, name="detectron2", abbrev_name=None
 ):
     """
     Initialize the detectron2 logger and set its verbosity level to "DEBUG".
@@ -52,11 +52,13 @@ def setup_logger(
 
     if abbrev_name is None:
         abbrev_name = "d2" if name == "detectron2" else name
-
+    abbrev_name = 'aaa'
     plain_formatter = logging.Formatter(
         "[%(asctime)s] %(name)s %(levelname)s: %(message)s", datefmt="%m/%d %H:%M:%S"
     )
 
+    if distributed_rank is None:
+        distributed_rank = int(os.environ.get('ACCELERATE_PROCESS_ID', 0))
     # stdout logging: master only
     if distributed_rank == 0:
         ch = logging.StreamHandler(stream=sys.stdout)
@@ -66,7 +68,7 @@ def setup_logger(
                 colored("[%(asctime)s %(name)s]: ", "green") + "%(message)s",
                 datefmt="%m/%d %H:%M:%S",
                 root_name=name,
-                # abbrev_name=str(abbrev_name),
+                abbrev_name=str(abbrev_name),
             )
         else:
             formatter = plain_formatter

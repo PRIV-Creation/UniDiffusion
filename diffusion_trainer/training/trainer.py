@@ -53,7 +53,7 @@ class DiffusionTrainer:
     def default_setup(self):
         self.accelerator = instantiate(self.cfg.accelerator)
         self.logger = setup_logger(name=__name__, distributed_rank=self.accelerator.process_index)
-
+        os.environ['ACCELERATE_PROCESS_ID'] = str(self.accelerator.process_index)
         self.logger.info(self.accelerator.state)
         if self.accelerator.is_local_main_process:
             transformers.utils.logging.set_verbosity_warning()

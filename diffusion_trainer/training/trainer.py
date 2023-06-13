@@ -173,14 +173,17 @@ class DiffusionTrainer:
 
         # prepare tracker
         output_dir = self.cfg.train.output_dir
-        if self.accelerator.is_main_process and self.cfg.train.wandb.enabled:
-            wandb_kwargs = {
-                'entity': self.cfg.train.wandb.entity,
-                'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
-                os.path.split(output_dir)[-2],
-            }
-            self.accelerator.init_trackers(self.cfg.train.wandb.project, config=vars(self.cfg),
-                                           init_kwargs={'wandb': wandb_kwargs})
+
+        if self.accelerator.is_main_process:
+            init_kwargs = dict()
+            if self.cfg.train.wandb.enabled:
+                wandb_kwargs = {
+                    'entity': self.cfg.train.wandb.entity,
+                    'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
+                    os.path.split(output_dir)[-2],
+                }
+                init_kwargs['wandb'] = wandb_kwargs
+            self.accelerator.init_trackers(self.cfg.train.project, config=vars(self.cfg), init_kwargs=init_kwargs)
 
         # prepare checkpoint hook
         self.accelerator.register_save_state_pre_hook(save_model_hook)
@@ -195,6 +198,7 @@ class DiffusionTrainer:
         self.logger.info(f"  Instantaneous batch size per device = {self.cfg.dataloader.batch_size}")
         self.logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
         self.logger.info(f"  Gradient Accumulation steps = {self.cfg.train.gradient_accumulation_iter}")
+        self.logger.info("****************************")
 
     def model_train(self):
         for model in self.models:

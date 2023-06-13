@@ -14,6 +14,7 @@ from diffusion_trainer.config import LazyCall as L
 
 train = {
     # common configs
+    'project': 'DiffusionTrainer',
     'output_dir': './output',
     'pretrained_model_name_or_path': '',
     'revision': '',
@@ -29,20 +30,19 @@ train = {
     'gradient_accumulation_iter': 1,
     # logging configs
     'checkpointing_iter': 5000,
-    # wandb
-    'wandb': {
-        'enabled': False,
-        'project': 'DiffusionTrainer',
-        'entity': None,
-    },
+    # Experiment Trackers
+    'wandb': {'enabled': False, 'entity': None,},
+    'tensorboard': {'enabled': False},
+    'comet_ml': {'enabled': False},
     # training mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0}
 }
 
+log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if train[platform]['enabled']]
 accelerator = L(Accelerator)(
     gradient_accumulation_steps=1,
     mixed_precision='fp16',  # "no", "fp16", "bf16"
-    log_with='wandb',  # Supported platforms are tensorboard, wandb and comet_ml. Use all to report to all integrations.
+    log_with=log_tracker if len(log_tracker) > 0 else None,  # Supported platforms are tensorboard, wandb and comet_ml. Use all to report to all integrations.
     # logging_dir=os.path.join(train['output_dir'], 'logs'),
     project_config=L(ProjectConfiguration)(total_limit=None),
 )

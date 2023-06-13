@@ -3,21 +3,21 @@ import transformers
 import os
 
 
-UNET_CLASSES = [
-    diffusers.UNet2DModel,
-]
+UNET_CLASSES = (
+    diffusers.UNet2DConditionModel,
+)
 
-EMA_CLASSES = [
+EMA_CLASSES = (
     diffusers.EMAModel,
-]
+)
 
-VAE_CLASSES = [
+VAE_CLASSES = (
     diffusers.AutoencoderKL,
-]
+)
 
-TEXT_ENCODER_CLASSES = [
+TEXT_ENCODER_CLASSES = (
     transformers.CLIPTextModel,
-]
+)
 
 
 def get_model_type(model):

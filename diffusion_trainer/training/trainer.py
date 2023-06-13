@@ -268,7 +268,7 @@ class DiffusionTrainer:
                     self.current_iter += 1
                     if accelerator.is_main_process:
                         if self.current_iter % self.cfg.train.checkpointing_iter == 0:
-                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter}")
+                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
                             accelerator.save_state(save_path)
                             self.logger.info(f"Saved state to {save_path}")
 

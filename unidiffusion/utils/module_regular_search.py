@@ -34,3 +34,21 @@ def get_module_type(input_module, module_type):
                 continue
             last_match_name = name
             yield module, name
+
+
+def get_model_by_relative_name(model, name):
+    names = name.split('.')
+    if len(names) == 1:
+        return model
+    layer_instance = model
+    for i, layer_name in enumerate(names):
+        if i < len(names) - 1:
+            if layer_name.isdigit():
+                layer_instance = layer_instance[int(layer_name)]
+            else:
+                layer_instance = getattr(layer_instance, layer_name)
+        else:
+            if layer_name.isdigit():
+                return layer_instance[int(layer_name)]
+            else:
+                return getattr(layer_instance, layer_name)

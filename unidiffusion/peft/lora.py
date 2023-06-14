@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import math
 import torch.nn.functional as F
+from unidiffusion.peft.proxy import ProxyLayer
 from unidiffusion.utils.module_regular_search import get_module_type
 from unidiffusion.utils.logger import setup_logger
 
@@ -15,20 +16,21 @@ LORA_SUPPORTED_MODULES = (
 )
 
 
-class BaseLoRAModule(nn.Module):
+class BaseLoRAModule(ProxyLayer):
+    CAN_BE_MERGED = True
     proxy_name: str
     target_replace_layer: str
+    org_forward = None
 
-    def __init__(self, org_module: nn.Module, **kwargs) -> None:
+    def __init__(self, org_module: nn.Module, org_name: str, **kwargs) -> None:
         super().__init__()
         self.org_module = org_module
+        self.original_name = org_name
     
     def apply_to(self):
         self.org_forward = self.org_module.forward
-
-    def set_trainable(self):
-        self.requires_grad_(True)
-        self.org_module.requires_grad_(False)
+        self.org_module.forward = self.forward
+        del self.org_module
 
     def get_trainable_parameters(self):
         for name, params in self.named_parameters():
@@ -45,8 +47,8 @@ class LoRALinearLayer(BaseLoRAModule):
     proxy_name = 'lora'
     target_replace_layer = 'Linear'
 
-    def __init__(self, org_module, rank=4, scale=1.0):
-        super().__init__(org_module)
+    def __init__(self, org_module, org_name, rank=4, scale=1.0):
+        super().__init__(org_module, org_name)
 
         in_features = org_module.in_features
         out_features = org_module.out_features
@@ -67,12 +69,7 @@ class LoRALinearLayer(BaseLoRAModule):
         nn.init.zeros_(self.up.weight)
 
         # control what params to be grad-enabled
-        self.set_trainable()
         self.apply_to()
-
-    # @property
-    # def trainable_parameters(self):
-    #     return itertools.chain(self.down.parameters(), self.up.parameters())
 
     def forward(self, hidden_states):
         orig_dtype = hidden_states.dtype
@@ -81,16 +78,16 @@ class LoRALinearLayer(BaseLoRAModule):
         down_hidden_states = self.down(hidden_states.to(dtype))
         up_hidden_states = self.up(down_hidden_states)
 
-        return up_hidden_states.to(orig_dtype) * self.scale + F.linear(hidden_states, self.weight, self.bias)
+        return up_hidden_states.to(orig_dtype) * self.scale + self.org_forward(hidden_states)
 
 
 class LoRAConvLayer(BaseLoRAModule):
     proxy_name = 'lora_conv'
     target_replace_layer = 'Conv2d'
 
-    def __init__(self, org_module: nn.Module, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
+    def __init__(self, org_module: nn.Module, org_name: str, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
         assert isinstance(org_module, nn.Conv2d)
-        super().__init__(org_module)
+        super().__init__(org_module, org_name)
         in_dim = org_module.in_channels
         k_size = org_module.kernel_size
         stride = org_module.stride
@@ -124,7 +121,6 @@ class LoRAConvLayer(BaseLoRAModule):
             torch.nn.init.kaiming_uniform_(self.lora_mid.weight, a=math.sqrt(5))
         self.multiplier = multiplier
 
-        self.set_trainable()
         self.apply_to()
 
     def make_weight(self):
@@ -143,34 +139,38 @@ class LoRAConvLayer(BaseLoRAModule):
             )
 
 
-def lora_proxy(module, lora_args):
+def lora_proxy(module, name, lora_args):
     if isinstance(module, nn.Linear):
-        m = LoRALinearLayer(module, **lora_args)
+        m = LoRALinearLayer(module, name, **lora_args)
         return m.get_trainable_parameters(), m
     elif isinstance(module, nn.Conv2d):
-        m = LoRAConvLayer(module, **lora_args)
+        m = LoRAConvLayer(module, name, **lora_args)
         return m.get_trainable_parameters(), m
     else:
         raise ValueError(f"LoRA does not support {type(module)}")
 
 
-def get_lora_proxy_layer(input_module, lora_args, input_name):
-    trainable_params = None
+def set_lora_layer(model_name, input_module, input_name, train_args, proxy_model):
     for module, name in get_module_type(input_module, LORA_SUPPORTED_MODULES):
         names = name.split('.')
         if names[0] == '':
+            # root module is supported
             logger.debug(f'LoRA proxy layer: {input_name}')
-            return lora_proxy(input_module, lora_args)
-        layer_instance = input_module
-        for i, layer_name in enumerate(names):
-            if i < len(names) - 1:
-                if layer_name.isdigit():
-                    layer_instance = layer_instance[int(layer_name)]
+            trainable_parameters, proxy_module = lora_proxy(module, input_name, train_args['module_kwargs'])
+            getattr(proxy_model, model_name).append(proxy_module)
+            proxy_model.params_group.append(dict(params=trainable_parameters, **train_args['optim_kwargs']))
+        else:
+            # recursively set supported modules
+            layer_instance = input_module
+            for i, layer_name in enumerate(names):
+                if i < len(names) - 1:
+                    if layer_name.isdigit():
+                        layer_instance = layer_instance[int(layer_name)]
+                    else:
+                        layer_instance = getattr(layer_instance, layer_name)
                 else:
-                    layer_instance = getattr(layer_instance, layer_name)
-            else:
-                lora_proxy_name = f'{input_name}.{name}' if name != '' else input_name
-                logger.debug(f'LoRA proxy layer: {lora_proxy_name}')
-                trainable_params, proxy_layer = lora_proxy(module, lora_args)
-                setattr(layer_instance, layer_name, proxy_layer)
-    return trainable_params, input_module
+                    lora_proxy_name = f'{input_name}.{name}' if name != '' else input_name
+                    logger.debug(f'LoRA proxy layer: {lora_proxy_name}')
+                    trainable_parameters, proxy_module = lora_proxy(module, lora_proxy_name, train_args['module_kwargs'])
+                    getattr(proxy_model, model_name).append(proxy_module)
+                    proxy_model.params_group.append(dict(params=trainable_parameters, **train_args['optim_kwargs']))

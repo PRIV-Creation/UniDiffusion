@@ -3,4 +3,5 @@ from diffusers import AutoencoderKL
 
 
 class AutoencoderKL_DT(BaseModel, AutoencoderKL):
-    pass
+    model_name = 'vae'
+

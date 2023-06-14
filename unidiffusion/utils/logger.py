@@ -28,7 +28,7 @@ class _ColorfulFormatter(logging.Formatter):
 
 @functools.lru_cache()  # so that calling setup_logger multiple times won't add many handlers
 def setup_logger(
-    output=None, distributed_rank=None, *, color=True, name="detectron2", abbrev_name=None
+    name="detectron2", output=None, distributed_rank=None, *, color=True, abbrev_name=None
 ):
     """
     Initialize the detectron2 logger and set its verbosity level to "DEBUG".

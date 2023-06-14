@@ -10,7 +10,7 @@ train.use_xformers = False
 unet.training_args = {
     r'attn2': {
         'mode': 'lora',
-        'layer_kwargs': {'scale': 1.0, 'rank': 4},
+        'module_kwargs': {'scale': 1.0, 'rank': 4},
         'optim_kwargs': {'lr': optimizer.lr},
     },
 }

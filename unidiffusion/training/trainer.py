@@ -10,6 +10,7 @@ import transformers
 from accelerate.utils import set_seed
 from omegaconf import OmegaConf
 from diffusers.training_utils import EMAModel
+from unidiffusion.peft.proxy import ProxyNetwork
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
@@ -34,6 +35,7 @@ class DiffusionTrainer:
     current_iter = 0
     
     def __init__(self, cfg, training):
+        self.proxy_model = None
         self.ema_unet = None
         self.cfg = cfg
         self.training = training
@@ -80,6 +82,12 @@ class DiffusionTrainer:
         self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):
+        # build proxy model to store trainable modules
+        self.proxy_model = ProxyNetwork()
+        self.cfg.vae.proxy_model = self.proxy_model
+        self.cfg.unet.proxy_model = self.proxy_model
+        self.cfg.text_encoder.proxy_model = self.proxy_model
+
         # build models and noise scheduler
         self.vae = instantiate(self.cfg.vae)
         self.tokenizer = instantiate(self.cfg.tokenizer)
@@ -123,17 +131,17 @@ class DiffusionTrainer:
 
     def build_optimizer(self):
         # get trainable parameters
-        trainable_params = []
-        for model in self.models:
-            p = model.get_trainable_params()
-            if p is not None:
-                trainable_params.extend(p)
-        # trainable_params = itertools.chain(*trainable_params)
-        self.trainable_params = trainable_params  # use for grad clip
+        # trainable_params = []
+        # for model in self.models:
+        #     p = model.get_trainable_params()
+        #     if p is not None:
+        #         trainable_params.extend(p)
+        # # trainable_params = itertools.chain(*trainable_params)
+        # self.trainable_params = trainable_params  # use for grad clip
 
         # build optimizer
 
-        self.cfg.optimizer.params = trainable_params
+        self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
 
         # print num of trainable parameters
@@ -158,9 +166,12 @@ class DiffusionTrainer:
         for model in self.models:
             if model.trainable:
                 model = self.accelerator.prepare(model)
+                model.requires_grad_(False)
             else:
                 model.requires_grad_(False)
                 model.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.proxy_model = self.accelerator.prepare(self.proxy_model)
+        self.proxy_model.set_requires_grad(True)
 
         # prepare xformers for unet
         if self.cfg.train.use_xformers and self.unet.trainable:
@@ -259,7 +270,7 @@ class DiffusionTrainer:
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(self.trainable_params, self.cfg.train.max_grad_norm)
+                    accelerator.clip_grad_norm_(self.proxy_model.parameters(), self.cfg.train.max_grad_norm)
 
                 optimizer.step()
                 lr_scheduler.step()
@@ -270,8 +281,14 @@ class DiffusionTrainer:
                     self.current_iter += 1
                     if accelerator.is_main_process:
                         if self.current_iter % self.cfg.train.checkpointing_iter == 0:
+                            # Save checkpoint
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
+                            # Save Unet/VAE/Text Encoder
                             accelerator.save_state(save_path)
+                            # Save Tokenizer
+                            # ......
+                            # Save EMA
+                            # ......
                             self.logger.info(f"Saved state to {save_path}")
 
                         # Validation

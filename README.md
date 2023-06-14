@@ -3,30 +3,42 @@
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/pytorch-2.0.0-blue.svg)](https://pytorch.org/)
 
-Easily conducting the **Uni**versity of Diffusion based on **Uni**fied pipeline.
+Easily conducting the **Uni**verse of Diffusion based on **Uni**fied workflow.
 
 ## Introduction
 UniDiffusion is a toolbox that provides state-of-the-art training and inference algorithms, based on diffusers.
+UniDiffusion is aimed at researchers and users who wish to deeply customize the training of stable diffusion. We hope that this code repository can provide excellent support for future research and application extensions.
 
-UniDiffusion is built to solve:
-- Using all training methods in a unified way. 
-- Easy to use, easy to customize, easy to combine, and easy to extend.
-- Clean and readable codebase.
+If you want to achieve these, have fun with UniDiffusion </summary>
+- Train only cross attention (or conv/...) layer.
+- Set different lr/weight decay/... for different layers.
+- Using or supporting different/new PEFT/PETL methods for different layers and easily merging them, e.g., finetune the convolution layer and update attention with lora.
+- Train all parameter in stable diffusion, including unet, vae, text_encoder, and automatically save and load.
+- ......
 
 **Note:** UniDiffusion is still under development. Some modules are borrowed from other code repositories and have not been tested yet, especially the components that are not enabled by default in the configuration system. We are working hard to improve this project.
 
 ## Features
-- *Decomposing Training Methods*. UniDiffusion decomposes methods into three dimension: trainable parameters, peft method, and training process. This process facilitates greater ease in the combination and enhancement of the method.
 - *Modular Design*. UniDiffusion is designed with a modular architecture. The modular design enables easy implementation of new methods. 
 - *Config System*. LazyConfig System for more flexible syntax and cleaner config files.
 - *Easy to Use*.
-  - The configuration files for all existing methods have been predefined. 
-  - Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
-  - Using [wandb](https://wandb.ai/) to log all training information.
+  - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
+  - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
+- *Unified*:
+  - [Training Workflow](#unified-training-workflow)
+  - [Trainable Parameter/Module Selection](#regular-matching-for-module-selection)
+  - [PEFT/PETL Methods Support](#powerful-support-for-peftpetl-methods)
 
-## Unified Training Pipeline
-In UniDiffusion, all training methods are decomposed into three dimensions: trainable parameters, peft method, and training process, which allows we conduct a unified training pipeline with strong config system.
+### Unified Training Workflow
+In UniDiffusion, all training methods are decomposed into three dimensions
+- Trainable parameters: which layer or which module will be updated?
+- PEFT/PETL method: how to update them? E.g., finetune, low-rank adaption, adapter, etc.
+- Training process: default to diffuion-denoising, which can be extended like XTI.
 
+It allows we conduct a unified training pipeline with strong config system.
+
+<details>
+<summary> Example for difference in training pipeline </summary>
 Here is a simple example. In diffusers, training `text-to-image finetune` and `dreambooth` like:
 ```bash
 python train_dreambooth.py --arg1 ......
@@ -53,15 +65,47 @@ unet.training_args = {'*': {'mode': 'finetune'}}
 text_encoder.training_args = {'*', {'mode': 'finetune', 'lr_mul': 0.1}}
 ```
 This facilitates easier customization, combination, and enhancement of methods, and also allows for the comparison of similarities and differences between methods through configuration files.
+</details>
+
+### Regular Matching for Module Selection
+In UniDiffusion, we provide a regular matching system for module selection. It allows us to select modules by regular matching. See [Module Regular Matching](docs/ModuleRegularMatching.md) for more details.
+
+### Powerful Support for PEFT/PETL Methods
+We provide a powerful support for PEFT/PETL methods. See [PEFT/PETL Methods](docs/PEFT.md) for more details.
 
 ## Installation
+1. Install prerequisites
 - Python 3.10
 - Pytorch 2.0 + CUDA11.8
 - CUDNN
+2. Install requirements
 ```bash
-conda create -n difftrainer python=3.10
 pip install -e requirements.txt
 ```
+3. Configuring accelerate and wandb
+```bash
+accelerate config
+wandb login
+```
+## Getting Started
+
+## Model Zoo
+<details open>
+<summary> Supported Personalization Methods</summary>
+- [x] [text-to-image finetune](configs/train/text_to_image_finetune.py)
+- [x] [dreambooth](configs/train/dreambooth.py)
+- [x] [lora](configs/train/text_to_image_lora.py)
+- [x] [textual inversion](configs/train/textual_inversion.py)
+- [ ] XTI
+- [ ] Custom Diffusion
+*Note:* Personalization methods are decomposes in trainable parameters, PEFT/PETL methods, and training process in UniDiffusion. See config file for more details.
+</details>
+<details open>
+<summary> Supported PEFT/PETL Methods</summary>
+- [x] [finetune](unidiffusion/peft/finetune.py)
+- [x] [lora](unidiffusion/peft/lora.py)
+- [ ] RepAdapter
+</details>
 
 ## Acknowledge
 - Diffusion Trainer is built based on [diffusers](https://github.com/huggingface/diffusers).

@@ -43,5 +43,6 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
                 else:
                     layer_instance = getattr(layer_instance, layer_name)
             else:
+                # TODO
                 setattr(layer_instance, layer_name, proxy_layer)
         return trainable_params

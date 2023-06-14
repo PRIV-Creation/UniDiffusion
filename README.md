@@ -1,7 +1,25 @@
-# UniDiffusion
-[![License](https://img.shields.io/badge/license-apache2.0-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/pytorch-2.0.0-blue.svg)](https://pytorch.org/)
+<div align="center">
+
+  <img src="assets/temp_logo.png" width="30%">
+</div>
+<h2 align="center">UniDiffusion</h2>
+<p align="center">
+    <a href="https://github.com/PRIV-Creation/UniDiffusion/releases">
+        <img alt="release" src="https://img.shields.io/github/v/release/PRIV-Creation/UniDiffusion">
+    </a>
+    <a href="">
+        <img alt="docs" src="https://img.shields.io/badge/docs-Doing-blue">
+    </a>
+    <a href="https://github.com/PRIV-Creation/UniDiffusion/blob/main/LICENSE">
+        <img alt="GitHub" src="https://img.shields.io/github/license/PRIV-Creation/UniDiffusion.svg?color=blue">
+    </a>
+    <a href="https://github.com/PRIV-Creation/UniDiffusion/">
+        <img alt="open issues" src="https://img.shields.io/badge/python-3.10-blue.svg">
+    </a>
+    <a href="https://github.com/PRIV-Creation/UniDiffusion/">
+        <img alt="open issues" src="https://img.shields.io/badge/pytorch-2.0.0-blue.svg">
+    </a>
+</p>
 
 Easily conducting the **Uni**verse of Diffusion based on **Uni**fied workflow.
 

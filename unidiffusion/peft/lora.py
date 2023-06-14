@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-import itertools
+import torch.nn.functional as F
 from unidiffusion.utils.module_regular_search import get_module_type
 from unidiffusion.utils.logger import setup_logger
 
@@ -53,6 +53,9 @@ class LoRALinearLayer(BaseLoRAModule):
         if rank > min(in_features, out_features):
             raise ValueError(f"LoRA rank {rank} must be less or equal than {min(in_features, out_features)}")
 
+        self.weight = org_module.weight
+        self.bias = org_module.bias
+
         self.down = nn.Linear(in_features, rank, bias=False)
         self.up = nn.Linear(rank, out_features, bias=False)
         # This value has the same meaning as the `--network_alpha` option in the kohya-ss trainer script.
@@ -78,7 +81,7 @@ class LoRALinearLayer(BaseLoRAModule):
         down_hidden_states = self.down(hidden_states.to(dtype))
         up_hidden_states = self.up(down_hidden_states)
 
-        return up_hidden_states.to(orig_dtype) * self.scale + self.org_forward(hidden_states)
+        return up_hidden_states.to(orig_dtype) * self.scale + F.linear(hidden_states, self.weight, self.bias)
 
 
 class LoRAConvLayer(BaseLoRAModule):

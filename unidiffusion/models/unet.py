@@ -25,8 +25,9 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
     def set_proxy_layer(self, module, name, train_args):
         # get proxy layer
         mode = train_args['mode']
-        proxy_layer_kwargs = train_args['layer_kwargs']
+        proxy_layer_kwargs = train_args.get('layer_kwargs', None)
         if mode == 'finetune':
+            module.requires_grad_(True)
             trainable_params, proxy_layer = module.parameters(), module
         elif mode == 'lora':
             trainable_params, proxy_layer = get_lora_proxy_layer(module, proxy_layer_kwargs, name)
@@ -35,6 +36,8 @@ class UNet2DConditionModel_DT(BaseModel, UNet2DConditionModel):
 
         # parse name
         names = name.split('.')
+        if len(names) == 1:
+            return trainable_params
         layer_instance = self
         for i, layer_name in enumerate(names):
             if i < len(names) - 1:

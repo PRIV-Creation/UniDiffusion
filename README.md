@@ -9,7 +9,7 @@ Easily conducting the **Uni**verse of Diffusion based on **Uni**fied workflow.
 UniDiffusion is a toolbox that provides state-of-the-art training and inference algorithms, based on diffusers.
 UniDiffusion is aimed at researchers and users who wish to deeply customize the training of stable diffusion. We hope that this code repository can provide excellent support for future research and application extensions.
 
-If you want to achieve these, have fun with UniDiffusion </summary>
+If you also want to implement the following things, have fun with UniDiffusion </summary>
 - Train only cross attention (or conv/...) layer.
 - Set different lr/weight decay/... for different layers.
 - Using or supporting different/new PEFT/PETL methods for different layers and easily merging them, e.g., finetune the convolution layer and update attention with lora.

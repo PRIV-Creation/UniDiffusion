@@ -110,16 +110,19 @@ wandb login
 ## Model Zoo
 <details open>
 <summary> Supported Personalization Methods</summary>
+
 - [x] [text-to-image finetune](configs/train/text_to_image_finetune.py)
 - [x] [dreambooth](configs/train/dreambooth.py)
 - [x] [lora](configs/train/text_to_image_lora.py)
 - [x] [textual inversion](configs/train/textual_inversion.py)
 - [ ] XTI
 - [ ] Custom Diffusion
+
 *Note:* Personalization methods are decomposes in trainable parameters, PEFT/PETL methods, and training process in UniDiffusion. See config file for more details.
 </details>
 <details open>
 <summary> Supported PEFT/PETL Methods</summary>
+
 - [x] [finetune](unidiffusion/peft/finetune.py)
 - [x] [lora](unidiffusion/peft/lora.py)
 - [ ] RepAdapter

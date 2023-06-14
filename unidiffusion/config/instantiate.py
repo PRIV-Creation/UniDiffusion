@@ -34,7 +34,7 @@ def dump_dataclass(obj: Any):
     return ret
 
 
-def instantiate(cfg):
+def instantiate(cfg, convert=True):
     """
     Recursively instantiate objects defined in dictionaries by
     "_target_" and arguments.
@@ -45,16 +45,17 @@ def instantiate(cfg):
 
     Returns:
         object instantiated by cfg
+        :param convert:
     """
     from omegaconf import ListConfig, DictConfig, OmegaConf
 
     if isinstance(cfg, ListConfig):
-        lst = [instantiate(x) for x in cfg]
+        lst = [instantiate(x, convert=convert) for x in cfg]
         return ListConfig(lst, flags={"allow_objects": True})
-    if isinstance(cfg, list):
+    if isinstance(cfg, list) and convert:
         # Specialize for list, because many classes take
         # list[objects] as arguments, such as ResNet, DatasetMapper
-        return [instantiate(x) for x in cfg]
+        return [instantiate(x, convert=convert) for x in cfg]
 
     # If input is a DictConfig backed by dataclasses (i.e. omegaconf's structured config),
     # instantiate it to the actual dataclass.
@@ -64,9 +65,9 @@ def instantiate(cfg):
     if isinstance(cfg, abc.Mapping) and "_target_" in cfg:
         # conceptually equivalent to hydra.utils.instantiate(cfg) with _convert_=all,
         # but faster: https://github.com/facebookresearch/hydra/issues/1200
-        cfg = {k: instantiate(v) for k, v in cfg.items()}
+        cfg = {k: instantiate(v, convert=convert) for k, v in cfg.items()}
         cls = cfg.pop("_target_")
-        cls = instantiate(cls)
+        cls = instantiate(cls, convert=convert)
 
         if isinstance(cls, str):
             cls_name = cls

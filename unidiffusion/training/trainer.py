@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
 from accelerate.utils import set_seed
+from omegaconf import OmegaConf
 from diffusers.training_utils import EMAModel
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
@@ -126,16 +127,17 @@ class DiffusionTrainer:
         for model in self.models:
             p = model.get_trainable_params()
             if p is not None:
-                trainable_params.append(p)
-        trainable_params = itertools.chain(*trainable_params)
+                trainable_params.extend(p)
+        # trainable_params = itertools.chain(*trainable_params)
         self.trainable_params = trainable_params  # use for grad clip
 
         # build optimizer
+
         self.cfg.optimizer.params = trainable_params
-        self.optimizer = instantiate(self.cfg.optimizer)
+        self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
 
         # print num of trainable parameters
-        num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group ['params']])
+        num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group['params']])
         self.logger.info(f"Number of trainable parameters: {num_params / 1e6} M")
 
     def build_scheduler(self):

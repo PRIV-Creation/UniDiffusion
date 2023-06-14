@@ -1,8 +1,19 @@
 import torch
 import torch.nn as nn
 import math
-import torch.nn.functional as F
-# from peft.proxy import BaseProxy
+import itertools
+from unidiffusion.utils.module_regular_search import get_module_type
+from unidiffusion.utils.logger import setup_logger
+
+
+logger = setup_logger(__name__)
+
+
+LORA_SUPPORTED_MODULES = (
+    nn.Linear,
+    nn.Conv2d,
+)
+
 
 class BaseLoRAModule(nn.Module):
     proxy_name: str
@@ -24,16 +35,17 @@ class BaseLoRAModule(nn.Module):
             if params.requires_grad:
                 yield params
     
-    def named_trainabl_parameters(self):
+    def named_trainable_parameters(self):
         for name, params in self.named_parameters():
             if params.requires_grad:
                 yield name, params
+
 
 class LoRALinearLayer(BaseLoRAModule):
     proxy_name = 'lora'
     target_replace_layer = 'Linear'
 
-    def __init__(self, org_module, rank=4, network_alpha=None, multiplier=1.0):
+    def __init__(self, org_module, rank=4, scale=1.0):
         super().__init__(org_module)
 
         in_features = org_module.in_features
@@ -45,10 +57,8 @@ class LoRALinearLayer(BaseLoRAModule):
         self.up = nn.Linear(rank, out_features, bias=False)
         # This value has the same meaning as the `--network_alpha` option in the kohya-ss trainer script.
         # See https://github.com/darkstorm2150/sd-scripts/blob/main/docs/train_network_README-en.md#execute-learning
-        self.network_alpha = network_alpha
         self.rank = rank
-        self.scale = network_alpha / rank
-        self.multiplier = multiplier
+        self.scale = scale
 
         nn.init.normal_(self.down.weight, std=1 / rank)
         nn.init.zeros_(self.up.weight)
@@ -56,7 +66,10 @@ class LoRALinearLayer(BaseLoRAModule):
         # control what params to be grad-enabled
         self.set_trainable()
         self.apply_to()
-    
+
+    # @property
+    # def trainable_parameters(self):
+    #     return itertools.chain(self.down.parameters(), self.up.parameters())
 
     def forward(self, hidden_states):
         orig_dtype = hidden_states.dtype
@@ -65,10 +78,7 @@ class LoRALinearLayer(BaseLoRAModule):
         down_hidden_states = self.down(hidden_states.to(dtype))
         up_hidden_states = self.up(down_hidden_states)
 
-        if self.network_alpha is not None:
-            up_hidden_states *= self.network_alpha / self.rank
-
-        return up_hidden_states.to(orig_dtype) * self.scale * self.multiplier + self.org_forward(hidden_states)
+        return up_hidden_states.to(orig_dtype) * self.scale + self.org_forward(hidden_states)
 
 
 class LoRAConvLayer(BaseLoRAModule):
@@ -121,18 +131,43 @@ class LoRAConvLayer(BaseLoRAModule):
 
     def forward(self, x):
         if self.cp:
-            return self.org_forward(x)  + self.dropout(
+            return self.org_forward(x) + self.dropout(
                 self.lora_up(self.lora_mid(self.lora_down(x)))* self.multiplier * self.scale
             )
         else:
-            return self.org_forward(x)  + self.dropout(
-                self.lora_up(self.lora_down(x))* self.multiplier * self.scale
+            return self.org_forward(x) + self.dropout(
+                self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
             )
-        
-def replace_lora_layer(org_module, **layer_kwargs):
-    if isinstance(org_module, nn.Linear):
-        return LoRALinearLayer(org_module, **layer_kwargs)
-    elif isinstance(org_module, nn.Conv2d):
-        return LoRAConvLayer(org_module, **layer_kwargs)
+
+
+def lora_proxy(module, lora_args):
+    if isinstance(module, nn.Linear):
+        m = LoRALinearLayer(module, **lora_args)
+        return m.get_trainable_parameters(), m
+    elif isinstance(module, nn.Conv2d):
+        m = LoRAConvLayer(module, **lora_args)
+        return m.get_trainable_parameters(), m
     else:
-        raise ValueError(f"LoRA does not support {type(org_module)}")
+        raise ValueError(f"LoRA does not support {type(module)}")
+
+
+def get_lora_proxy_layer(input_module, lora_args, input_name):
+    trainable_params = None
+    for module, name in get_module_type(input_module, LORA_SUPPORTED_MODULES):
+        names = name.split('.')
+        if names[0] == '':
+            logger.debug(f'LoRA proxy layer: {input_name}')
+            return lora_proxy(input_module, lora_args)
+        layer_instance = input_module
+        for i, layer_name in enumerate(names):
+            if i < len(names) - 1:
+                if layer_name.isdigit():
+                    layer_instance = layer_instance[int(layer_name)]
+                else:
+                    layer_instance = getattr(layer_instance, layer_name)
+            else:
+                lora_proxy_name = f'{input_name}.{name}' if name != '' else input_name
+                logger.debug(f'LoRA proxy layer: {lora_proxy_name}')
+                trainable_params, proxy_layer = lora_proxy(module, lora_args)
+                setattr(layer_instance, layer_name, proxy_layer)
+    return trainable_params, input_module

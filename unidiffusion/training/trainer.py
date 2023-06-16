@@ -210,7 +210,8 @@ class DiffusionTrainer:
         self.model_train()
 
         # Only show the progress bar once on each machine.
-        progress_bar = tqdm(range(self.current_iter, self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
+        progress_bar = tqdm(range(self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
+        progress_bar.update(self.current_iter)
         progress_bar.set_description("Steps")
 
         accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler

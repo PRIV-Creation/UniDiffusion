@@ -3,6 +3,7 @@
   <img src="assets/temp_logo.png" width="30%">
 </div>
 <h2 align="center">UniDiffusion</h2>
+<p align="center">Navigate the <strong>Uni</strong>verse of <strong>Diffusion</strong> models with <strong>Uni</strong>fied workflow.</p>
 <p align="center">
     <a href="https://github.com/PRIV-Creation/UniDiffusion/releases">
         <img alt="release" src="https://img.shields.io/github/v/release/PRIV-Creation/UniDiffusion">
@@ -21,7 +22,7 @@
     </a>
 </p>
 
-Easily conducting the **Uni**verse of Diffusion based on **Uni**fied workflow.
+
 
 ## Introduction
 UniDiffusion is a toolbox that provides state-of-the-art training and inference algorithms, based on diffusers.

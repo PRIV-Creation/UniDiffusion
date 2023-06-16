@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import math
-import torch.nn.functional as F
 from unidiffusion.peft.proxy import ProxyLayer
 from unidiffusion.utils.module_regular_search import get_module_type
 from unidiffusion.utils.logger import setup_logger
@@ -18,8 +17,6 @@ LORA_SUPPORTED_MODULES = (
 
 class BaseLoRAModule(ProxyLayer):
     CAN_BE_MERGED = True
-    proxy_name: str
-    target_replace_layer: str
     org_forward = None
 
     def __init__(self, org_module: nn.Module, org_name: str, **kwargs) -> None:
@@ -44,8 +41,6 @@ class BaseLoRAModule(ProxyLayer):
 
 
 class LoRALinearLayer(BaseLoRAModule):
-    proxy_name = 'lora'
-    target_replace_layer = 'Linear'
 
     def __init__(self, org_module, org_name, rank=4, scale=1.0):
         super().__init__(org_module, org_name)
@@ -82,8 +77,6 @@ class LoRALinearLayer(BaseLoRAModule):
 
 
 class LoRAConvLayer(BaseLoRAModule):
-    proxy_name = 'lora_conv'
-    target_replace_layer = 'Conv2d'
 
     def __init__(self, org_module: nn.Module, org_name: str, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
         assert isinstance(org_module, nn.Conv2d)

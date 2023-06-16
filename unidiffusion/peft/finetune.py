@@ -1,4 +1,3 @@
-import torch
 from unidiffusion.peft.proxy import ProxyLayer
 
 

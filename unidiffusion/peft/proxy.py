@@ -6,18 +6,9 @@ from unidiffusion.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-class BaseProxy(torch.nn.Module):
-    proxy_name: str
-
-
 class ProxyLayer(torch.nn.Module):
     CAN_BE_MERGED = True
     original_name: str
-
-    # def __init__(self, original_module, proxy_module):
-    #     super().__init__()
-    #     self.original_module = original_module
-    #     self.proxy_module = proxy_module
 
     def merge_layer(self):
         pass

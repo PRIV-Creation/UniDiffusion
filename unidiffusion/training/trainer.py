@@ -1,7 +1,6 @@
 import diffusers
 import os
 from unidiffusion.config import instantiate
-import itertools
 from tqdm.auto import tqdm
 import torch
 import torch.nn.functional as F
@@ -48,7 +47,6 @@ class DiffusionTrainer:
             self.build_optimizer()
             self.build_scheduler()
             self.build_evaluator()
-            self.build_criterion()
             self.prepare_training()
             self.print_training_state()
 
@@ -130,17 +128,6 @@ class DiffusionTrainer:
         # .......
 
     def build_optimizer(self):
-        # get trainable parameters
-        # trainable_params = []
-        # for model in self.models:
-        #     p = model.get_trainable_params()
-        #     if p is not None:
-        #         trainable_params.extend(p)
-        # # trainable_params = itertools.chain(*trainable_params)
-        # self.trainable_params = trainable_params  # use for grad clip
-
-        # build optimizer
-
         self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
 
@@ -156,9 +143,6 @@ class DiffusionTrainer:
         self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
 
     def build_evaluator(self):
-        pass
-
-    def build_criterion(self):
         pass
 
     def prepare_training(self):

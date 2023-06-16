@@ -1,10 +1,4 @@
-import re
-import torch
-import itertools
-from abc import ABC
-from omegaconf import OmegaConf
-from unidiffusion.peft.lora import set_lora_layer
-from unidiffusion.peft.finetune import set_finetune_layer
+from unidiffusion.peft import set_lora_layer, set_finetune_layer
 from unidiffusion.utils.module_regular_search import get_module_pattern
 from unidiffusion.utils.logger import setup_logger
 
@@ -13,7 +7,6 @@ class BaseModel:
     trainable = False
     params_train_args = dict()
     params_group = []
-    proxy_name = None
     model_name: str
 
     @classmethod

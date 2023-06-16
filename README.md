@@ -112,7 +112,7 @@ wandb login
 <summary> Supported Personalization Methods</summary>
 
 - [x] [text-to-image finetune](configs/train/text_to_image_finetune.py)
-- [x] [dreambooth](configs/train/dreambooth.py)
+- [x] [dreambooth](configs/train/text_to_image_finetune.py)
 - [x] [lora](configs/train/text_to_image_lora.py)
 - [x] [textual inversion](configs/train/textual_inversion.py)
 - [ ] XTI

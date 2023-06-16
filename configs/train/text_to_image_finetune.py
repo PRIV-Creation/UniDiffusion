@@ -1,9 +1,11 @@
-from configs.get_common_config import *
+from configs.common.get_common_config import *
 
 
-# update configs
-optimizer.optimizer = "SGD"
-optimizer.lr = 2e-7
+# Demonstrate to how to update configs
+#
+optimizer.lr = 1e-4
+dataloader.batch_size = 2
+train.use_xformers = True
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 

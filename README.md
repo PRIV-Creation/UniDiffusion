@@ -38,12 +38,12 @@ If you also want to implement the following things, have fun with UniDiffusion <
 **Note:** UniDiffusion is still under development. Some modules are borrowed from other code repositories and have not been tested yet, especially the components that are not enabled by default in the configuration system. We are working hard to improve this project.
 
 ## Features
-- *Modular Design*. UniDiffusion is designed with a modular architecture. The modular design enables easy implementation of new methods. 
-- *Config System*. LazyConfig System for more flexible syntax and cleaner config files.
-- *Easy to Use*.
+- **Modular Design**. UniDiffusion is designed with a modular architecture. The modular design enables easy implementation of new methods. 
+- **Config System**. LazyConfig System for more flexible syntax and cleaner config files.
+- **Easy to Use**.
   - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
   - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
-- *Unified*:
+- **Unified**:
   - [Training Workflow](#unified-training-workflow)
   - [Trainable Parameter/Module Selection](#regular-matching-for-module-selection)
   - [PEFT/PETL Methods Support](#powerful-support-for-peftpetl-methods)

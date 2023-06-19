@@ -9,4 +9,9 @@ train.use_xformers = True
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
-unet.training_args = {'': {'mode': 'finetune', 'optim_kwargs': {'lr': optimizer.lr}}}
+unet.training_args = {
+    '': {
+        'mode': 'finetune',
+        'optim_kwargs': {'lr': optimizer.lr}
+    }
+}

@@ -32,6 +32,9 @@ class ImageDataset(BaseDataset):
             ]
         )
 
+    def get_placeholders(self):
+        return [self.placeholder]
+
     def __len__(self):
         return self._length
 

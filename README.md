@@ -105,7 +105,14 @@ accelerate config
 wandb login
 ```
 ## Getting Started
+### Demo
+1. Train Dreambooth / LoRA / text-to-image Finetune.
 
+### [Doing] Tutorial
+1. [TODO] Customize your training process.
+2. [TODO] Supporting new dataset.
+3. [TODO] Supporting new PETL method.
+4. [TODO] Supporting new training pipeline.
 ## Model Zoo
 <details open>
 <summary> Supported Personalization Methods</summary>

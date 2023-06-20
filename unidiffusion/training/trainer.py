@@ -1,7 +1,7 @@
 import diffusers
 import os
 from unidiffusion.config import instantiate
-from tqdm.auto import tqdm
+from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -41,9 +41,10 @@ class DiffusionTrainer:
 
         self.default_setup()
         self.build_model()
-        self.load_checkpoint()
         if training:
             self.build_dataloader()
+            self.set_placeholders()
+            self.load_checkpoint()
             self.build_optimizer()
             self.build_scheduler()
             self.build_evaluator()
@@ -52,6 +53,10 @@ class DiffusionTrainer:
 
     def default_setup(self):
         self.accelerator = instantiate(self.cfg.accelerator)
+        # prepare checkpoint hook
+        self.accelerator.register_save_state_pre_hook(save_model_hook)
+        self.accelerator.register_load_state_pre_hook(load_model_hook)
+
         self.logger = setup_logger(name=__name__, distributed_rank=self.accelerator.process_index)
         os.environ['ACCELERATE_PROCESS_ID'] = str(self.accelerator.process_index)
         self.logger.info(self.accelerator.state)
@@ -101,7 +106,23 @@ class DiffusionTrainer:
             self.ema_unet = EMAModel(self.unet, model_cls=type(self.unet), model_config=self.unet.config)
         else:
             self.ema_unet = None
-            
+
+        # prepare models
+        for model in self.models:
+            if model.trainable:
+                model = self.accelerator.prepare(model)
+                model.requires_grad_(False)
+            else:
+                model.requires_grad_(False)
+                model.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.proxy_model = self.accelerator.prepare(self.proxy_model)
+
+    def set_placeholders(self):
+        placeholders = self.dataloader.dataset.get_placeholders()
+        if placeholders is not None:
+            self.tokenizer.set_placeholders(placeholders)
+            self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
+
     def load_checkpoint(self):
         if self.cfg.train.resume is not None:
             if self.cfg.train.resume != "latest":
@@ -124,9 +145,6 @@ class DiffusionTrainer:
                 current_iter = int(path.split("-")[1])
                 self.current_iter = current_iter * self.cfg.train.gradient_accumulation_iter
 
-        # Load tokenizer
-        # .......
-
     def build_optimizer(self):
         self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
@@ -146,15 +164,6 @@ class DiffusionTrainer:
         pass
 
     def prepare_training(self):
-        # prepare models
-        for model in self.models:
-            if model.trainable:
-                model = self.accelerator.prepare(model)
-                model.requires_grad_(False)
-            else:
-                model.requires_grad_(False)
-                model.to(self.accelerator.device, dtype=self.weight_dtype)
-        self.proxy_model = self.accelerator.prepare(self.proxy_model)
         self.proxy_model.set_requires_grad(True)
 
         # prepare xformers for unet
@@ -181,10 +190,6 @@ class DiffusionTrainer:
                 }
                 init_kwargs['wandb'] = wandb_kwargs
             self.accelerator.init_trackers(self.cfg.train.project, config=vars(self.cfg), init_kwargs=init_kwargs)
-
-        # prepare checkpoint hook
-        self.accelerator.register_save_state_pre_hook(save_model_hook)
-        self.accelerator.register_load_state_pre_hook(load_model_hook)
 
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter

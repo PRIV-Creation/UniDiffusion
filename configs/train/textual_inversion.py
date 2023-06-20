@@ -11,11 +11,9 @@ train.use_xformers = True
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
-tokenizers.training_args = {'placeholders': None}   # placeholders will be set from datasets.
-
 text_encoder.training_args = {
     'text_embedding': {
-        'placeholders': None,    # placeholders will be set from datasets.
+        'initial': True,         # whether to init additional token by their text.
         'optim_kwargs': {'lr': optimizer.lr}
     }
 }

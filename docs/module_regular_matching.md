@@ -1,13 +1,13 @@
-UNet modules:
-```
-# all modules
-*
-# all transformer modules
-attentions
-# 
-```
+## Regular Matching for Module Selection
+
+This module is designed to arbitrarily select modules in the model according to a unified form. We use regular matching to select modules.
+
+For example, all modules in Unet are listed following:
+<details>
+<summary> Name and type of each module in UNet </summary>
 
 ```
+# Code:
 for name, module in unet.named_modules():
     print(name, type(module))
 
@@ -720,4 +720,43 @@ mid_block.resnets.1.nonlinearity <class 'torch.nn.modules.activation.SiLU'>
 conv_norm_out <class 'torch.nn.modules.normalization.GroupNorm'>
 conv_act <class 'torch.nn.modules.activation.SiLU'>
 conv_out <class 'torch.nn.modules.conv.Conv2d'>
+```
+</details>
+
+Then we can select modules by regular matching. For exmaple, we define several cases for unet in ```unidiffusion/utils/module_regular_search.py```:
+```
+PREDEFINED_PATTERN_UNET = {
+    'attention': r'attn(0|1)',
+    'cross_attention': r'attn2',
+    'cross_attention.q': r'attn2\.to_q',
+    'cross_attention.k': r'attn2\.to_k',
+    'cross_attention.v': r'attn2\.to_v',
+    'cross_attention.qkv': r'attn2\.(to_q|to_k|to_v)',
+    'feedforward': r'ff',
+    'resnets': r'resnet',
+    'resnets.conv': r'resnets\.\d\.conv'
+}
+```
+You can set these predefined pattern in config (the following two have same effect):
+```python
+# regular pattern
+unet.training_args = {
+    r'attn2\.to_k': {
+        ...
+    },
+}
+# predefined pattern
+unet.training_args = {
+    r'cross_attention.k': {
+        ...
+    },
+```
+You can also write your regular pattern:
+```python
+# all convolution layers
+conv
+# the second fully-connected layer in feedforward layer
+ff\.net\.2
+# all attention layer in upsample blocks
+up_blocks\.\d\.attentions
 ```

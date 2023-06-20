@@ -8,8 +8,11 @@
     <a href="https://github.com/PRIV-Creation/UniDiffusion/releases">
         <img alt="release" src="https://img.shields.io/github/v/release/PRIV-Creation/UniDiffusion">
     </a>
-    <a href="">
+    <a href="https://github.com/PRIV-Creation/Awesome-Diffusion-Personalization">
         <img alt="docs" src="https://img.shields.io/badge/docs-Doing-blue">
+    </a>
+    <a href="">
+        <img alt="docs" src="https://img.shields.io/badge/related_papers-awesome_diffusion_personalization-green">
     </a>
     <a href="https://github.com/PRIV-Creation/UniDiffusion/blob/main/LICENSE">
         <img alt="GitHub" src="https://img.shields.io/github/license/PRIV-Creation/UniDiffusion.svg?color=blue">
@@ -43,11 +46,6 @@ If you also want to implement the following things, have fun with UniDiffusion <
 - **Easy to Use**.
   - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
   - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
-- **Unified**:
-  - [Training Workflow](#unified-training-workflow)
-  - [Trainable Parameter/Module Selection](#regular-matching-for-module-selection)
-  - [PEFT/PETL Methods Support](#powerful-support-for-peftpetl-methods)
-
 ### Unified Training Workflow
 In UniDiffusion, all training methods are decomposed into three dimensions
 - Trainable parameters: which layer or which module will be updated?
@@ -87,7 +85,7 @@ This facilitates easier customization, combination, and enhancement of methods, 
 </details>
 
 ### Regular Matching for Module Selection
-In UniDiffusion, we provide a regular matching system for module selection. It allows us to select modules by regular matching. See [Module Regular Matching](docs/ModuleRegularMatching.md) for more details.
+In UniDiffusion, we provide a regular matching system for module selection. It allows us to select modules by regular matching. See [Regular Matching for Module Selection](docs/module_regular_matching.md) for more details.
 
 ### Powerful Support for PEFT/PETL Methods
 We provide a powerful support for PEFT/PETL methods. See [PEFT/PETL Methods](docs/PEFT.md) for more details.
@@ -150,3 +148,5 @@ If you use this toolbox in your research or wish to refer to the baseline result
 
 <details>
 <summary> Citation Supported Algorithms </summary>
+Comming soon
+</details>

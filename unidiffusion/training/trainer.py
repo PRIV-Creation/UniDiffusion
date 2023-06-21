@@ -66,12 +66,16 @@ class DiffusionTrainer:
             self.prepare_inference()
 
     def default_setup(self):
-        # save all configs
-        LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
-        # setup log tracker
+        # setup log tracker and accelerator
         log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if self.cfg.train[platform]['enabled']]
         self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
         self.accelerator = instantiate(self.cfg.accelerator)
+
+        if self.accelerator.is_main_process:
+            os.makedirs(self.cfg.train.output_dir, exist_ok=True)
+            # save all configs
+            LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
+
         # prepare checkpoint hook
         self.accelerator.register_save_state_pre_hook(save_model_hook)
         self.accelerator.register_load_state_pre_hook(load_model_hook)
@@ -88,9 +92,6 @@ class DiffusionTrainer:
 
         if self.cfg.train.seed is not None:
             set_seed(self.cfg.train.seed)
-
-        if self.accelerator.is_main_process:
-            os.makedirs(self.cfg.train.output_dir, exist_ok=True)
 
         # mixed precision
         self.weight_dtype = torch.float32

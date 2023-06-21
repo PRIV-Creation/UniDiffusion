@@ -8,4 +8,3 @@ class AutoencoderKL_DT(BaseModel, AutoencoderKL):
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
         return super().from_pretrained(*args, **kwargs)
-

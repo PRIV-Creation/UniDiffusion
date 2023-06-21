@@ -2,7 +2,8 @@ from unidiffusion.config import get_config
 
 
 # get default config
-dataloader = get_config("common/data/image_dataset.py").dataloader
+dataset = get_config("common/data/image_dataset.py").dataset
+dataloader = get_config("common/dataloader.py").dataloader
 optimizer = get_config("common/optim.py").optimizer
 lr_scheduler = get_config("common/scheduler.py").lr_scheduler
 train = get_config("common/train.py").train

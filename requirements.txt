@@ -1,4 +1,5 @@
 cloudpickle
+datasets
 iopath
 termcolor
 torch

@@ -32,11 +32,10 @@ UniDiffusion is a toolbox that provides state-of-the-art training and inference 
 UniDiffusion is aimed at researchers and users who wish to deeply customize the training of stable diffusion. We hope that this code repository can provide excellent support for future research and application extensions.
 
 If you also want to implement the following things, have fun with UniDiffusion </summary>
-- Train only cross attention (or conv/...) layer.
-- Set different lr/weight decay/... for different layers.
-- Using or supporting different/new PEFT/PETL methods for different layers and easily merging them, e.g., finetune the convolution layer and update attention with lora.
+- Train only cross attention (or convolution / feedforward / ...) layer.
+- Set different lr / weight decay / ... for different layers.
+- Using or supporting PEFT/PETL methods for different layers and easily merging them, e.g., finetune the convolution layer and update attention layer with lora.
 - Train all parameter in stable diffusion, including unet, vae, text_encoder, and automatically save and load.
-- ......
 
 **Note:** UniDiffusion is still under development. Some modules are borrowed from other code repositories and have not been tested yet, especially the components that are not enabled by default in the configuration system. We are working hard to improve this project.
 
@@ -107,12 +106,13 @@ wandb login
 ## Getting Started
 ### Demo
 1. Train Dreambooth / LoRA / text-to-image Finetune.
+2. Customize your training process.
 
 ### [Doing] Tutorial
-1. [TODO] Customize your training process.
-2. [TODO] Supporting new dataset.
-3. [TODO] Supporting new PETL method.
-4. [TODO] Supporting new training pipeline.
+1. [TODO] Supporting new dataset.
+2. [TODO] Supporting new PETL method.
+3. [TODO] Supporting new training pipeline.
+
 ## Model Zoo
 <details open>
 <summary> Supported Personalization Methods</summary>

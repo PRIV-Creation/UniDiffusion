@@ -46,6 +46,7 @@ class DiffusionTrainer:
     current_iter = 0
     
     def __init__(self, cfg, training):
+        self.dataset = None
         self.proxy_model = None
         self.ema_unet = None
         self.cfg = cfg
@@ -101,7 +102,11 @@ class DiffusionTrainer:
             self.weight_dtype = torch.bfloat16
 
     def build_dataloader(self):
-        self.cfg.dataloader.dataset.tokenizer = self.tokenizer
+        self.cfg.dataset.tokenizer = self.tokenizer
+        self.dataset = instantiate(self.cfg.dataset)
+
+        self.cfg.dataloader.dataset = self.dataset
+        self.cfg.dataloader.collate_fn = self.dataset.preprocess_train
         self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):

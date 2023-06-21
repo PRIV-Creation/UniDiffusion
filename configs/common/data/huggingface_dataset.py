@@ -1,8 +1,8 @@
-from datasets import load_dataset
+from unidiffusion.datasets.huggingface_dataset import HuggingFaceDataset
 from unidiffusion.config import LazyCall as L
 
 
-dataset = L(load_dataset)(
+dataset = L(HuggingFaceDataset)(
     path="lambdalabs/pokemon-blip-captions",
     name="",
     cache_dir="data/",

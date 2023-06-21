@@ -1,3 +1,4 @@
+import torch
 import glob
 from .dataset import BaseDataset
 from torchvision import transforms
@@ -33,6 +34,15 @@ class ImageDataset(BaseDataset):
                 transforms.Normalize([0.5], [0.5]),
             ]
         )
+
+        def preprocess_train(examples):
+            pixel_values = torch.stack([example["pixel_values"] for example in examples])
+            pixel_values = pixel_values.to(memory_format=torch.contiguous_format).float()
+            input_ids = torch.stack([example["input_ids"] for example in examples])
+            prompts = [example["prompt"] for example in examples]
+            return {"pixel_values": pixel_values, "input_ids": input_ids, "prompt": prompts}
+
+        self.preprocess_train = preprocess_train
 
     def get_placeholders(self):
         return [self.inversion_placeholder]

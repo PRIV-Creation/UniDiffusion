@@ -60,7 +60,7 @@ Here is a simple example. In diffusers, training `text-to-image finetune` and `d
 python train_dreambooth.py --arg1 ......
 python train_finetune.py --arg1 ......
 ```
-and combining or adjusting some of methods are difficult (e.g., only training cross attention during dreambooth).
+and combining or adjusting some of the methods are difficult (e.g., only training cross attention during dreambooth).
 
 In UniDiffusion, we can easily design our own training arguments in config file:
 ```python
@@ -104,8 +104,22 @@ accelerate config
 wandb login
 ```
 ## Getting Started
-### Demo
-1. Train Dreambooth / LoRA / text-to-image Finetune.
+See [Train Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
+```bash
+accelerate launch scrits/train.py --config-file configs/train/text_to_image_finetune.py
+```
+
+### [MVP] Train SD with 2 lines of code
+We provide a minimum viable product (MVP) for training stable diffusion with 2 lines of code.
+The YAML file is saved during training and we provide a demo config in `config/demo_config.yaml`.
+```python
+from unidiffusion import DiffusionTrainer, LazyConfig
+
+DiffusionTrainer(LazyConfig.load('config/demo_config.yaml'), training=True).train()
+```
+
+### Detailed Demo
+1. [Train Dreambooth / LoRA / text-to-image Finetune.](docs/train_demo.md)
 2. Customize your training process.
 
 ### [Doing] Tutorial

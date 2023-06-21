@@ -10,11 +10,13 @@ class ImageDataset(BaseDataset):
         image_paths,
         tokenizer,
         placeholder,
+        inversion_placeholder,
         resolution=512,
     ):
         super().__init__()
         self.tokenizer = tokenizer
         self.placeholder = placeholder
+        self.inversion_placeholder = inversion_placeholder
         self.resolution = resolution
 
         self.image_paths = glob.glob(f'{image_paths}/**/*.png', recursive=True)
@@ -33,7 +35,7 @@ class ImageDataset(BaseDataset):
         )
 
     def get_placeholders(self):
-        return [self.placeholder]
+        return [self.inversion_placeholder]
 
     def __len__(self):
         return self._length
@@ -42,7 +44,8 @@ class ImageDataset(BaseDataset):
         example = {}
         instance_image = Image.open(self.image_paths[index % self.num_instance_images])
 
-        prompt = f'a photo of {self.placeholder}'
+        placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
+        prompt = f'a photo of {placeholder}'
         example['prompt'] = prompt
         example["pixel_values"] = self.image_transforms(instance_image)
         example["input_ids"] = self.tokenizer(

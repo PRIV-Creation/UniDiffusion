@@ -124,7 +124,6 @@ class DiffusionTrainer:
         for model in self.models:
             if model.trainable:
                 model = self.accelerator.prepare(model)
-                model.requires_grad_(False)
             else:
                 model.requires_grad_(False)
                 model.to(self.accelerator.device, dtype=self.weight_dtype)
@@ -314,7 +313,7 @@ class DiffusionTrainer:
         vae = self.accelerator.unwrap_model(self.vae) if self.vae.trainable else self.vae
 
         # create pipeline
-        pipeline = DiffusionPipeline.from_pretrained(
+        pipeline = StableDiffusionPipeline.from_pretrained(
             self.cfg.train.pretrained_model_name_or_path,
             text_encoder=text_encoder,
             tokenizer=self.tokenizer,

@@ -7,8 +7,10 @@ class CLIPTextModel_DT(BaseModel, CLIPTextModel):
     model_name = 'text_encoder'
 
     def set_placeholders(self, placeholders, tokenizer, proxy_model):
+        if self.params_train_args is None:
+            return None
         # add text embedding
-        if (text_embedding_args := self.params_train_args.pop('text_embedding')) is not None:
+        if (text_embedding_args := self.params_train_args.pop('text_embedding', None)) is not None:
             if text_embedding_args.get('initial', True):
                 ori_token_embeds = self.get_input_embeddings().weight.data
                 additional_embedding = []

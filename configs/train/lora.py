@@ -11,6 +11,6 @@ unet.training_args = {
     r'attn2': {
         'mode': 'lora',
         'module_kwargs': {'scale': 1.0, 'rank': 4},
-        'optim_kwargs': {'lr': optimizer.lr},
+        'optim_kwargs': {'lr': '${optimizer.lr}'},
     },
 }

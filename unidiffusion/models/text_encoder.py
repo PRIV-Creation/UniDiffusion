@@ -6,6 +6,10 @@ from transformers import CLIPTextModel
 class CLIPTextModel_DT(BaseModel, CLIPTextModel):
     model_name = 'text_encoder'
 
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        return super().from_pretrained(*args, **kwargs)
+
     def set_placeholders(self, placeholders, tokenizer, proxy_model):
         if self.params_train_args is None:
             return None

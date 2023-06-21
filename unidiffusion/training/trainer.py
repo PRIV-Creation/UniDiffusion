@@ -12,6 +12,7 @@ from accelerate.utils import set_seed
 from omegaconf import OmegaConf
 from diffusers.training_utils import EMAModel
 from unidiffusion.peft.proxy import ProxyNetwork
+from unidiffusion.config import LazyConfig
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
@@ -52,17 +53,22 @@ class DiffusionTrainer:
 
         self.default_setup()
         self.build_model()
+        self.build_dataloader()
+        self.set_placeholders()
+        self.load_checkpoint()
         if training:
-            self.build_dataloader()
-            self.set_placeholders()
-            self.load_checkpoint()
             self.build_optimizer()
             self.build_scheduler()
             self.build_evaluator()
             self.prepare_training()
             self.print_training_state()
+        else:
+            self.prepare_inference()
 
     def default_setup(self):
+        # save all configs
+        LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
+        # setup log tracker
         log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if self.cfg.train[platform]['enabled']]
         self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
         self.accelerator = instantiate(self.cfg.accelerator)
@@ -202,6 +208,12 @@ class DiffusionTrainer:
                 }
                 init_kwargs['wandb'] = wandb_kwargs
             self.accelerator.init_trackers(self.cfg.train.project, config=vars(self.cfg), init_kwargs=init_kwargs)
+
+    def prepare_inference(self):
+        self.proxy_model.set_requires_grad(False)
+        # prepare xformers for unet
+        if self.cfg.train.use_xformers:
+            self.unet.enable_xformers_memory_efficient_attention()
 
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
@@ -343,7 +355,12 @@ class DiffusionTrainer:
         images = []
         for prompt in prompts:
             with torch.autocast("cuda"):
-                image = pipeline(prompt, num_inference_steps=25, generator=generator).images[0]
+                image = pipeline(
+                    prompt,
+                    num_inference_steps=self.cfg.inference.num_inference_steps,
+                    guidance_scale=self.cfg.inference.guidance_scale,
+                    generator=generator
+                ).images[0]
             images.append(image)
 
         # save images

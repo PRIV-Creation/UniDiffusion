@@ -43,6 +43,8 @@ inference = {
     'batch_size': 1,
     'prompts': None,    # using dataset prompt if None
     'total_num': 10,
+    'num_inference_steps': 25,
+    'guidance_scale': 1.0,
 }
 
 accelerator = L(Accelerator)(

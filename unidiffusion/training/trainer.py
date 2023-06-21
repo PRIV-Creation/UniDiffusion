@@ -236,6 +236,11 @@ class DiffusionTrainer:
         while self.current_iter < self.cfg.train.max_iter:
             batch = next(iter(self.dataloader))
             with accelerator.accumulate(unet):
+                if accelerator.is_main_process:
+                    # Validation
+                    if self.current_iter % self.cfg.inference.inference_iter == 0:
+                        self.inference()
+
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
                 latents = latents * vae.config.scaling_factor
@@ -292,10 +297,6 @@ class DiffusionTrainer:
                             # Save EMA
                             # ......
                             self.logger.info(f"Saved state to {save_path}")
-
-                        # Validation
-                        if self.current_iter % self.cfg.inference.inference_iter == 0:
-                            self.inference()
 
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)

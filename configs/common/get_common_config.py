@@ -6,6 +6,7 @@ dataloader = get_config("common/data/image_dataset.py").dataloader
 optimizer = get_config("common/optim.py").optimizer
 lr_scheduler = get_config("common/scheduler.py").lr_scheduler
 train = get_config("common/train.py").train
+inference = get_config("common/train.py").inference
 accelerator = get_config("common/train.py").accelerator
 vae = get_config("common/model.py").vae
 unet = get_config("common/model.py").unet

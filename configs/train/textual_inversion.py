@@ -1,5 +1,3 @@
-import tokenizers.trainers
-
 from configs.common.get_common_config import *
 
 

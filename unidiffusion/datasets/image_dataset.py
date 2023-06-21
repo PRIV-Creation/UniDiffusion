@@ -42,7 +42,8 @@ class ImageDataset(BaseDataset):
         example = {}
         instance_image = Image.open(self.image_paths[index % self.num_instance_images])
 
-        prompt = f'a photo of <{self.placeholder}>'
+        prompt = f'a photo of {self.placeholder}'
+        example['prompt'] = prompt
         example["pixel_values"] = self.image_transforms(instance_image)
         example["input_ids"] = self.tokenizer(
             prompt,

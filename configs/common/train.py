@@ -17,7 +17,7 @@ train = {
     'project': 'DiffusionTrainer',
     'output_dir': './output',
     'pretrained_model_name_or_path': '',
-    'revision': '',
+    'revision': None,
     'seed': 0,
     'use_xformers': True,
     'gradient_checkpointing': False,
@@ -36,6 +36,13 @@ train = {
     'comet_ml': {'enabled': False},
     # training mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0}
+}
+
+inference = {
+    'inference_iter': 5000,
+    'batch_size': 1,
+    'prompts': None,    # using dataset prompt if None
+    'total_num': 10,
 }
 
 log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if train[platform]['enabled']]

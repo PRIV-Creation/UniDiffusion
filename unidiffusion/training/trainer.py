@@ -1,5 +1,7 @@
 import diffusers
 import os
+import numpy as np
+import wandb
 from unidiffusion.config import instantiate
 from tqdm import tqdm
 import torch
@@ -13,6 +15,15 @@ from unidiffusion.peft.proxy import ProxyNetwork
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
+from diffusers import (
+    AutoencoderKL,
+    DDPMScheduler,
+    DiffusionPipeline,
+    DPMSolverMultistepScheduler,
+    DDIMScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
 
 
 class DiffusionTrainer:
@@ -282,8 +293,9 @@ class DiffusionTrainer:
                             self.logger.info(f"Saved state to {save_path}")
 
                         # Validation
-                        # -------
-                        
+                        if self.current_iter % self.cfg.inference.inference_iter == 0:
+                            self.inference()
+
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=self.current_iter)
@@ -295,7 +307,66 @@ class DiffusionTrainer:
         accelerator.end_training()
 
     def inference(self):
-        pass
+        unet = self.accelerator.unwrap_model(self.unet) if self.unet.trainable else self.unet
+        text_encoder = self.accelerator.unwrap_model(self.text_encoder) if self.text_encoder.trainable else self.text_encoder
+        vae = self.accelerator.unwrap_model(self.vae) if self.vae.trainable else self.vae
+
+        # create pipeline
+        pipeline = DiffusionPipeline.from_pretrained(
+            self.cfg.train.pretrained_model_name_or_path,
+            text_encoder=text_encoder,
+            tokenizer=self.tokenizer,
+            unet=unet,
+            vae=vae,
+            revision=self.cfg.train.revision,
+            torch_dtype=self.weight_dtype,
+            safety_checker=None,
+        )
+        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+        pipeline = pipeline.to(self.accelerator.device)
+        pipeline.set_progress_bar_config(disable=True)
+
+        # run inference
+        if (seed := self.cfg.train.seed) is None:
+            generator = None
+        else:
+            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed)
+
+        # inference prompts
+        if self.cfg.inference.prompts is not None:
+            prompts = [self.cfg.inference.prompts] * self.cfg.inference.total_num
+        else:
+            prompts = [self.dataloader.dataset[index]['prompt'] for index in range(self.cfg.inference.total_num)]
+
+        images = []
+        for prompt in prompts:
+            with torch.autocast("cuda"):
+                image = pipeline(prompt, num_inference_steps=25, generator=generator).images[0]
+            images.append(image)
+
+        # save images
+        save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
+        os.makedirs(save_path, exist_ok=True)
+        for index, image in enumerate(images):
+            image_path = os.path.join(save_path, f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}.png')
+            image.save(image_path)
+
+        for tracker in self.accelerator.trackers:
+            if tracker.name == "tensorboard":
+                np_images = np.stack([np.asarray(img) for img in images])
+                tracker.writer.add_images("validation", np_images, self.current_iter, dataformats="NHWC")
+            if tracker.name == "wandb":
+                tracker.log(
+                    {
+                        "validation": [
+                            wandb.Image(image, caption=f"{i}: {prompt}") for i, (image, prompt) in
+                            enumerate(zip(images, prompts))
+                        ]
+                    }
+                )
+
+        del pipeline
+        torch.cuda.empty_cache()
 
     def evaluate(self):
         pass

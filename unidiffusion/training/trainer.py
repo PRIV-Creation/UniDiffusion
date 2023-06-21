@@ -63,6 +63,8 @@ class DiffusionTrainer:
             self.print_training_state()
 
     def default_setup(self):
+        log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if self.cfg.train[platform]['enabled']]
+        self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
         self.accelerator = instantiate(self.cfg.accelerator)
         # prepare checkpoint hook
         self.accelerator.register_save_state_pre_hook(save_model_hook)

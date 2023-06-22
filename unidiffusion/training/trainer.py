@@ -238,6 +238,12 @@ class DiffusionTrainer:
     def train(self):
         self.model_train()
 
+        # keep original embeddings as reference
+        if (start_token_idx := self.text_encoder.start_token_idx) is not None:
+            orig_embeds_params = self.accelerator.unwrap_model(self.text_encoder).get_input_embeddings().weight.data.clone()
+        else:
+            orig_embeds_params = None
+
         # Only show the progress bar once on each machine.
         progress_bar = tqdm(range(self.cfg.train.max_iter), disable=not self.accelerator.is_local_main_process)
         progress_bar.update(self.current_iter)
@@ -294,6 +300,15 @@ class DiffusionTrainer:
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+
+                # make sure not update any embedding weights besides the newly added token
+                if self.text_encoder.start_token_idx is not None:
+                    with torch.no_grad():
+                        index_no_updates = torch.ones((len(self.tokenizer),), dtype=torch.bool)
+                        index_no_updates[start_token_idx:] = False
+                        accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
+                            index_no_updates
+                        ] = orig_embeds_params[index_no_updates]
 
                 if accelerator.sync_gradients:
                     progress_bar.update(1)

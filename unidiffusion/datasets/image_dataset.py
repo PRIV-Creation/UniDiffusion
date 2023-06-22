@@ -8,7 +8,7 @@ from PIL import Image
 class ImageDataset(BaseDataset):
     def __init__(
         self,
-        image_paths,
+        path,
         tokenizer,
         placeholder,
         inversion_placeholder,
@@ -20,7 +20,7 @@ class ImageDataset(BaseDataset):
         self.inversion_placeholder = inversion_placeholder
         self.resolution = resolution
 
-        self.image_paths = glob.glob(f'{image_paths}/**/*.png', recursive=True)
+        self.image_paths = glob.glob(f'{path}/**/*.png', recursive=True)
         self.image_paths.sort()
 
         self.num_instance_images = len(self.image_paths)

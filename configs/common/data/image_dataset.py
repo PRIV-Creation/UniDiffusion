@@ -3,7 +3,7 @@ from unidiffusion.config import LazyCall as L
 
 
 dataset = L(ImageDataset)(
-    image_paths='samples/faces',
+    path=None,
     placeholder=None,
-    inversion_placeholder='<face>'
+    inversion_placeholder=None,
 )

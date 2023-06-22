@@ -5,6 +5,8 @@ from transformers import CLIPTextModel
 
 class CLIPTextModel_DT(BaseModel, CLIPTextModel):
     model_name = 'text_encoder'
+    start_token_idx = None
+    end_token_idx = None
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):
@@ -31,6 +33,8 @@ class CLIPTextModel_DT(BaseModel, CLIPTextModel):
             if text_embedding_args.get('initial', True):
                 token_embeds = self.get_input_embeddings().weight.data
                 token_embeds[start_idx:] = torch.stack(additional_embedding)
+            self.start_token_idx = start_idx
+            self.end_token_idx = start_idx
 
         # set embedding to trainable
         self.text_model.embeddings.token_embedding.requires_grad_(True)

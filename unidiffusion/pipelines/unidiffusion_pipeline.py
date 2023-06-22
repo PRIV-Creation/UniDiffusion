@@ -128,15 +128,6 @@ class UniDiffusionPipeline:
         else:
             self.ema_unet = None
 
-        # prepare models
-        for model in self.models:
-            if model.trainable:
-                model = self.accelerator.prepare(model)
-            else:
-                model.requires_grad_(False)
-                model.to(self.accelerator.device, dtype=self.weight_dtype)
-        self.proxy_model = self.accelerator.prepare(self.proxy_model)
-
     def set_placeholders(self):
         placeholders = self.dataset.get_placeholders()
         if placeholders is not None:
@@ -205,6 +196,15 @@ class UniDiffusionPipeline:
         for evaluator in self.evaluators:
             evaluator.before_train(self.dataset, self.accelerator)
             self.logger.info(evaluator)
+
+        # prepare models
+        for model in self.models:
+            if model.trainable:
+                model = self.accelerator.prepare(model)
+            else:
+                model.requires_grad_(False)
+                model.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.proxy_model = self.accelerator.prepare(self.proxy_model)
 
         # prepare tracker
         output_dir = self.cfg.train.output_dir

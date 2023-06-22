@@ -14,6 +14,7 @@ train = {
     'gradient_checkpointing': False,
     'resume': None,  # "latest" | checkpoint path
     'use_ema': True,
+    'resolution': 512,
     # training configs
     'max_iter': 10000,
     'max_grad_norm': 1.0,
@@ -31,18 +32,26 @@ train = {
 
 inference = {
     'inference_iter': 5000,
-    'batch_size': 1,
+    'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'total_num': 10,
+    'scheduler': 'DPMSolverMultistepScheduler',
     'num_inference_steps': 25,
     'guidance_scale': 1.0,
 }
 
 evaluation = {
     'evaluation_iter': 10000,
-    'evaluator': [
-        None,
-    ]
+    'total_num': 1000,  # synthesis images num
+    'batch_size': 4,
+    'prompts': None,    # using dataset prompt if None
+    'scheduler': 'DPMSolverMultistepScheduler',
+    'num_inference_steps': 25,
+    'guidance_scale': 1.0,
+    'evaluator': {
+        'fid': {'enabled': False, 'features': 2048, 'real_num_samples': 10000},
+        'inception_score': {'enabled': False},
+    }
 }
 
 accelerator = L(Accelerator)(

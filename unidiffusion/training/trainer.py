@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 from diffusers.training_utils import EMAModel
 from unidiffusion.peft.proxy import ProxyNetwork
 from unidiffusion.config import LazyConfig
+from unidiffusion.evaluation import EVALUATOR
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
@@ -39,7 +40,8 @@ class DiffusionTrainer:
     optimizer = None
     models = None
     current_iter = 0
-    
+    evaluators = []
+
     def __init__(self, cfg, training):
         self.dataset = None
         self.proxy_model = None
@@ -179,7 +181,9 @@ class DiffusionTrainer:
         self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
 
     def build_evaluator(self):
-        pass
+        for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
+            if evaluator_args.pop('enabled'):
+                self.evaluators.append(EVALUATOR[evaluator](**evaluator_args))
 
     def prepare_training(self):
         self.proxy_model.set_requires_grad(True)
@@ -258,6 +262,9 @@ class DiffusionTrainer:
                     # Validation
                     if self.current_iter % self.cfg.inference.inference_iter == 0:
                         self.inference()
+                    # Evaluation
+                    if self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                        self.evaluate()
 
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
@@ -324,7 +331,6 @@ class DiffusionTrainer:
                             # Save EMA
                             # ......
                             self.logger.info(f"Saved state to {save_path}")
-
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=self.current_iter)
@@ -403,5 +409,46 @@ class DiffusionTrainer:
         torch.cuda.empty_cache()
 
     def evaluate(self):
-        pass
+        unet = self.accelerator.unwrap_model(self.unet) if self.unet.trainable else self.unet
+        text_encoder = self.accelerator.unwrap_model(
+            self.text_encoder) if self.text_encoder.trainable else self.text_encoder
+        vae = self.accelerator.unwrap_model(self.vae) if self.vae.trainable else self.vae
+
+        # create pipeline
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            self.cfg.train.pretrained_model_name_or_path,
+            text_encoder=text_encoder,
+            tokenizer=self.tokenizer,
+            unet=unet,
+            vae=vae,
+            revision=self.cfg.train.revision,
+            torch_dtype=self.weight_dtype,
+            safety_checker=None,
+        )
+        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+        pipeline = pipeline.to(self.accelerator.device)
+        pipeline.set_progress_bar_config(disable=True)
+
+        # run inference
+        if (seed := self.cfg.train.seed) is None:
+            generator = None
+        else:
+            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed)
+
+        # inference prompts
+        if self.cfg.evaluation.prompts is not None:
+            prompts = [self.cfg.evaluation.prompts] * self.cfg.evaluation.total_num
+        else:
+            prompts = [self.dataset[index]['prompt'] for index in range(self.cfg.evaluation.total_num)]
+
+        images = []
+        for prompt in prompts:
+            with torch.autocast("cuda"):
+                image = pipeline(
+                    prompt,
+                    num_inference_steps=self.cfg.evaluation.num_inference_steps,
+                    guidance_scale=self.cfg.evaluation.guidance_scale,
+                    generator=generator
+                ).images[0]
+            images.append(image)
 

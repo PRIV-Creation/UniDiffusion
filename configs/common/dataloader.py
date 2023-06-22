@@ -8,4 +8,5 @@ dataloader = L(torch.utils.data.DataLoader)(
     shuffle=True,
     batch_size=2,
     num_workers=2,
+    persistent_workers=True,
 )

@@ -106,7 +106,7 @@ wandb login
 ## Getting Started
 See [Train Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
 ```bash
-accelerate launch scrits/train.py --config-file configs/train/text_to_image_finetune.py
+accelerate launch scrits/common.py --config-file configs/train/text_to_image_finetune.py
 ```
 
 ### [MVP] Train SD with 2 lines of code

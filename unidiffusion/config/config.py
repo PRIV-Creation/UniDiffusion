@@ -38,7 +38,7 @@ def get_config(config_path):
 
     Args:
         config_path (str): config file name relative to detrex's "configs/"
-            directory, e.g., "common/train.py"
+            directory, e.g., "common/common.py"
 
     Returns:
         omegaconf.DictConfig: a config object

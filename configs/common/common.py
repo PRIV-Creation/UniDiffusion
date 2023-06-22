@@ -38,6 +38,13 @@ inference = {
     'guidance_scale': 1.0,
 }
 
+evaluation = {
+    'evaluation_iter': 10000,
+    'evaluator': [
+        None,
+    ]
+}
+
 accelerator = L(Accelerator)(
     gradient_accumulation_steps='${train.gradient_accumulation_iter}',
     mixed_precision='fp16',  # "no", "fp16", "bf16"

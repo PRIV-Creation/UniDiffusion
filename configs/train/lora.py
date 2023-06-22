@@ -1,8 +1,6 @@
 from configs.common.get_common_config import *
 
-# update configs
-optimizer.optimizer = "AdamW"
-optimizer.lr = 1e-4
+dataset = get_config("common/data/huggingface_dataset.py").dataset
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 

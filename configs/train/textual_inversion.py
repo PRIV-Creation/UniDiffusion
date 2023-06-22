@@ -1,9 +1,7 @@
 from configs.common.get_common_config import *
 
 
-optimizer.lr = 1e-4
-dataloader.batch_size = 2
-train.use_xformers = True
+dataset = get_config("common/data/image_dataset.py").dataset
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 

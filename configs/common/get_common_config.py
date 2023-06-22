@@ -2,7 +2,6 @@ from unidiffusion.config import get_config
 
 
 # get default config
-dataset = get_config("common/data/huggingface_dataset.py").dataset
 dataloader = get_config("common/dataloader.py").dataloader
 optimizer = get_config("common/optim.py").optimizer
 lr_scheduler = get_config("common/scheduler.py").lr_scheduler

@@ -19,7 +19,6 @@ class FIDEvaluator(BaseEvaluator, FrechetInceptionDistance):
         # random select different data for each process
         random.seed(0)
         total_idx = random.sample(range(len(dataset)), min(self.real_image_num, len(dataset)))
-        print(f'{total_idx}, accelerator.num_processes: {accelerator.num_processes}')
         image_per_process = len(total_idx) // accelerator.num_processes
         process_idx = total_idx[accelerator.process_index * image_per_process: (accelerator.process_index + 1) * image_per_process]
 

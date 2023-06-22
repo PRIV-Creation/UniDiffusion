@@ -49,7 +49,7 @@ evaluation = {
     'num_inference_steps': 25,
     'guidance_scale': 1.0,
     'evaluator': {
-        'fid': {'enabled': False, 'features': 2048, 'real_num_samples': 10000},
+        'fid': {'enabled': False, 'feature': 2048, 'real_image_num': 10000},
         'inception_score': {'enabled': False},
     }
 }

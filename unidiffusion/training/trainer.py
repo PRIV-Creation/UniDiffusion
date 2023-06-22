@@ -48,7 +48,6 @@ class DiffusionTrainer:
         self.ema_unet = None
         self.cfg = cfg
         self.training = training
-
         self.default_setup()
         self.build_model()
         self.build_dataloader()
@@ -184,6 +183,8 @@ class DiffusionTrainer:
         for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
             if evaluator_args.pop('enabled'):
                 self.evaluators.append(EVALUATOR[evaluator](**evaluator_args))
+                self.logger.info(f'Build {evaluator} evaluator.')
+        _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
 
     def prepare_training(self):
         self.proxy_model.set_requires_grad(True)
@@ -198,6 +199,10 @@ class DiffusionTrainer:
                 self.unet.enable_gradient_checkpointing()
             if self.text_encoder.trainable:
                 self.text_encoder.gradient_checkpointing_enable()
+
+        # prepare evaluator
+        for evaluator in self.evaluators:
+            evaluator.before_train(self.dataset, self.accelerator)
 
         # prepare tracker
         output_dir = self.cfg.train.output_dir

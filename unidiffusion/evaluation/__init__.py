@@ -1,7 +1,7 @@
-from .fid_evaluator import FID
+from .fid_evaluator import FIDEvaluator
 
 
 EVALUATOR = {
-    'fid': FID,
+    'fid': FIDEvaluator,
     'inception_score': None,
 }

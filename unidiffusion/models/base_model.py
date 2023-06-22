@@ -13,7 +13,7 @@ class BaseModel:
     def from_pretrained(cls, proxy_model=None, training_args=None, *args, **kwargs):
         cls.trainable = training_args is not None
         cls.params_train_args = training_args
-        setup_logger(__name__).info('Model {} trainable: {}.'.format(cls.__name__, cls.trainable))
+        setup_logger(__name__).info('Model {} trainable: {}.'.format(cls.model_name, cls.trainable))
         model = super().from_pretrained(*args, **kwargs)
         if cls.trainable:
             model.parse_training_args(proxy_model)

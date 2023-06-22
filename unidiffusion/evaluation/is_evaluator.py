@@ -1,5 +1,5 @@
 from .base_evaluator import BaseEvaluator
-from torchmetrics.image.fid import FrechetInceptionDistance
+from torchmetrics.image.inception import InceptionScore
 import random
 from tqdm import tqdm
 from unidiffusion.utils.logger import setup_logger
@@ -8,14 +8,17 @@ from unidiffusion.utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-class FIDEvaluator(BaseEvaluator, FrechetInceptionDistance):
-    name = 'FID'
+class ISEvaluator(BaseEvaluator, InceptionScore):
+    name = 'InceptionScore'
 
-    def __init__(self, real_image_num, reset_real_features=False, normalize=True, **kwargs):
-        super().__init__(reset_real_features=reset_real_features, normalize=normalize, **kwargs)
+    def __init__(self, real_image_num=0, normalize=True, **kwargs):
+        super().__init__(normalize=normalize, **kwargs)
         self.real_image_num = real_image_num
 
     def before_train(self, dataset, accelerator):
+        if self.real_image_num == 0:
+            return None
+
         # random select different data for each process
         random.seed(0)
         total_idx = random.sample(range(len(dataset)), min(self.real_image_num, len(dataset)))
@@ -33,14 +36,16 @@ class FIDEvaluator(BaseEvaluator, FrechetInceptionDistance):
             self.update((dataset[i]["pixel_values"].unsqueeze(0).to(accelerator.device) + 1) / 2, real=True)
             progress_bar.update(1)
 
+    def update(self, image, real):
+        super().update(image)
+
     def compute(self):
         result = super().compute()
         return {
-            'fid': result.item()
+            'inception-score_kl_mean': result[0].item(),
+            'inception-score_kl_std': result[0].item()
         }
 
     def __repr__(self):
-        return f'FIDEvaluator:\n' \
-                f'  real_image_num: {self.real_image_num}\n' \
-                f'  real_features_num_samples: {self.real_features_num_samples.item()}\n' \
-                f'  fake_features_num_samples: {self.fake_features_num_samples.item()}\n'
+        return f'InceptionScore:\n' \
+                f'  real_image_num: {self.real_image_num}\n'

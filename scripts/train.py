@@ -12,4 +12,3 @@ if __name__ == '__main__':
     cfg = LazyConfig.load(args.config_file)
     cfg = LazyConfig.apply_overrides(cfg, args.opts)
     main(cfg)
-

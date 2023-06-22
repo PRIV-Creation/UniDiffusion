@@ -4,6 +4,7 @@ import numpy as np
 import wandb
 from unidiffusion.config import instantiate
 from tqdm import tqdm
+import random
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
@@ -203,6 +204,7 @@ class DiffusionTrainer:
         # prepare evaluator
         for evaluator in self.evaluators:
             evaluator.before_train(self.dataset, self.accelerator)
+            self.logger.info(evaluator)
 
         # prepare tracker
         output_dir = self.cfg.train.output_dir
@@ -269,7 +271,8 @@ class DiffusionTrainer:
                         self.inference()
                     # Evaluation
                     if self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
-                        self.evaluate()
+                        evaluation_results = self.evaluate()
+                        accelerator.log(evaluation_results, step=self.current_iter)
 
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
@@ -435,16 +438,18 @@ class DiffusionTrainer:
         pipeline.set_progress_bar_config(disable=True)
 
         # run inference
-        if (seed := self.cfg.train.seed) is None:
-            generator = None
-        else:
-            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed)
+        generator = torch.Generator(device=self.accelerator.device).manual_seed(self.cfg.train.seed + self.accelerator.process_index)
 
-        # inference prompts
+        # random select different data for each process
         if self.cfg.evaluation.prompts is not None:
             prompts = [self.cfg.evaluation.prompts] * self.cfg.evaluation.total_num
         else:
-            prompts = [self.dataset[index]['prompt'] for index in range(self.cfg.evaluation.total_num)]
+            # to keep the same prompts with real images and different between processes
+            random.seed(0)
+            total_idx = random.sample(range(len(self.dataset)), min(self.cfg.evaluation.total_num, len(self.dataset)))
+            image_per_process = len(total_idx) // self.accelerator.num_processes
+            process_idx = total_idx[self.accelerator.process_index * image_per_process: (self.accelerator.process_index + 1) * image_per_process]
+            prompts = [self.dataset[index]['prompt'] for index in process_idx]
 
         images = []
         for prompt in prompts:
@@ -453,7 +458,14 @@ class DiffusionTrainer:
                     prompt,
                     num_inference_steps=self.cfg.evaluation.num_inference_steps,
                     guidance_scale=self.cfg.evaluation.guidance_scale,
-                    generator=generator
+                    generator=generator,
+                    output_type='pt',
                 ).images[0]
-            images.append(image)
+                _ = [evaluator.update(image[None], real=False) for evaluator in self.evaluators]
 
+        results = dict()
+        for evaluator in self.evaluators:
+            results.update(evaluator.compute())
+            evaluator.reset()
+
+        return results

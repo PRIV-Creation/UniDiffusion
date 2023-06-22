@@ -112,10 +112,11 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 ### [MVP] Train SD with 2 lines of code
 We provide a minimum viable product (MVP) for training stable diffusion with 2 lines of code.
 The YAML file is saved during training and we provide a demo config in `config/demo_config.yaml`.
-```python
-from unidiffusion import DiffusionTrainer, LazyConfig
 
-DiffusionTrainer(LazyConfig.load('config/demo_config.yaml'), training=True).train()
+```python
+from unidiffusion import UniDiffusionPipeline, LazyConfig
+
+UniDiffusionPipeline(LazyConfig.load('config/demo_config.yaml'), training=True).train()
 ```
 
 ### Detailed Demo

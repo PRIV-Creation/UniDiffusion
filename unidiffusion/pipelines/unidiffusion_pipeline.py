@@ -24,7 +24,7 @@ from diffusers import (
 )
 
 
-class DiffusionTrainer:
+class UniDiffusionPipeline:
     tokenizer = None
     noise_scheduler = None
     text_encoder = None
@@ -156,7 +156,7 @@ class DiffusionTrainer:
 
             if path is None:
                 self.logger.warn(
-                    f"Checkpoint '{self.cfg.train.resume}' does not exist. Starting a new training run."
+                    f"Checkpoint '{self.cfg.train.resume}' does not exist. Starting a new pipelines run."
                 )
                 self.cfg.train.resume = None
             else:
@@ -228,7 +228,7 @@ class DiffusionTrainer:
 
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
-        self.logger.info("***** Running training *****")
+        self.logger.info("***** Running pipelines *****")
         self.logger.info(f"  Num examples = {len(self.dataset)}")
         self.logger.info(f"  Num batches each epoch = {len(self.dataloader)}")
         self.logger.info(f"  Num iterations = {self.cfg.train.max_iter}")

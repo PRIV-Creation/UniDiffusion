@@ -15,7 +15,7 @@ train = {
     'resume': None,  # "latest" | checkpoint path
     'use_ema': True,
     'resolution': 512,
-    # training configs
+    # pipelines configs
     'max_iter': 10000,
     'max_grad_norm': 1.0,
     'lr_warmup_iter': 0,
@@ -26,7 +26,7 @@ train = {
     'wandb': {'enabled': False, 'entity': None,},
     'tensorboard': {'enabled': False},
     'comet_ml': {'enabled': False},
-    # training mechanisms
+    # pipelines mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0}
 }
 

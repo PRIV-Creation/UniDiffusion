@@ -7,7 +7,7 @@ setup(
     packages=find_packages(),
     author="PRIV-Creation",
     author_email="priv@bupt.edu.cn",
-    description="Diffusion training toolbox.",
+    description="Diffusion pipelines toolbox.",
     license="Apache-2.0 license",
     keywords="diffusion, stable-diffusion, dreambooth, lora",
     url="https://github.com/PRIV-Creation/UniDiffusion",   # project home page, if any

@@ -1,8 +1,6 @@
 from configs.common.get_common_config import *
 
 
-# Demonstrate to how to update configs
-#
 optimizer.lr = 1e-4
 dataloader.batch_size = 2
 train.use_xformers = True

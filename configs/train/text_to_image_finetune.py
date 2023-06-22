@@ -6,8 +6,6 @@ optimizer.lr = 1e-4
 dataloader.batch_size = 2
 
 # not use textual inversion
-dataloader.dataset.placeholder = 'face'
-dataloader.dataset.inversion_placeholder = None
 train.use_xformers = True
 
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'

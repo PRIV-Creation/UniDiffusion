@@ -37,7 +37,7 @@ class HuggingFaceDataset(BaseDataset):
             random_flip=True
     ):
         super().__init__()
-        self.dataset = load_dataset(path, name, cache_dir=cache_dir)
+        self.dataset = load_dataset(path, name, cache_dir=cache_dir)["train"]
         self.tokenizer = tokenizer
         self.caption_column = caption_column
 
@@ -53,14 +53,18 @@ class HuggingFaceDataset(BaseDataset):
         def preprocess_train(examples):
             images = [image.convert("RGB") for image in examples[image_column]]
             examples["pixel_values"] = [train_transforms(image) for image in images]
-            examples["input_ids"] = tokenize_captions(examples)
+            examples["input_ids"] = tokenize_captions(examples, tokenizer, caption_column, is_train=True)
             return examples
 
-        self.preprocess_train = preprocess_train
+        self.dataset = self.dataset.with_transform(preprocess_train)
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, index):
-        return self.dataset[index]
+        example = self.dataset[index]
+        if "text" in example and "prompt" not in example:
+            example["prompt"] = example["text"]
+            example.pop("text")
+        return example
 

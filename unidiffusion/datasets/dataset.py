@@ -11,6 +11,4 @@ class BaseDataset(Dataset):
     def get_placeholders(self):
         pass
 
-    def preprocess_train(self, examples):
-        pass
 

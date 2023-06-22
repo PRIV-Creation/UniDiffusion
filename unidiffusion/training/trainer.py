@@ -17,13 +17,8 @@ from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
 from diffusers import (
-    AutoencoderKL,
-    DDPMScheduler,
-    DiffusionPipeline,
     DPMSolverMultistepScheduler,
-    DDIMScheduler,
     StableDiffusionPipeline,
-    UNet2DConditionModel,
 )
 
 
@@ -106,7 +101,6 @@ class DiffusionTrainer:
         self.dataset = instantiate(self.cfg.dataset)
 
         self.cfg.dataloader.dataset = self.dataset
-        self.cfg.dataloader.collate_fn = self.dataset.preprocess_train
         self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):
@@ -142,7 +136,7 @@ class DiffusionTrainer:
         self.proxy_model = self.accelerator.prepare(self.proxy_model)
 
     def set_placeholders(self):
-        placeholders = self.dataloader.dataset.get_placeholders()
+        placeholders = self.dataset.get_placeholders()
         if placeholders is not None:
             self.tokenizer.set_placeholders(placeholders)
             self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
@@ -224,7 +218,7 @@ class DiffusionTrainer:
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
         self.logger.info("***** Running training *****")
-        self.logger.info(f"  Num examples = {len(self.dataloader.dataset)}")
+        self.logger.info(f"  Num examples = {len(self.dataset)}")
         self.logger.info(f"  Num batches each epoch = {len(self.dataloader)}")
         self.logger.info(f"  Num iterations = {self.cfg.train.max_iter}")
         self.logger.info(f"  Instantaneous batch size per device = {self.cfg.dataloader.batch_size}")
@@ -275,7 +269,7 @@ class DiffusionTrainer:
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
-                encoder_hidden_states = text_encoder(batch["input_ids"][:, 0])[0].to(dtype=self.weight_dtype)
+                encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=self.weight_dtype)
 
                 # Predict the noise residual
                 model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
@@ -356,7 +350,7 @@ class DiffusionTrainer:
         if self.cfg.inference.prompts is not None:
             prompts = [self.cfg.inference.prompts] * self.cfg.inference.total_num
         else:
-            prompts = [self.dataloader.dataset[index]['prompt'] for index in range(self.cfg.inference.total_num)]
+            prompts = [self.dataset[index]['prompt'] for index in range(self.cfg.inference.total_num)]
 
         images = []
         for prompt in prompts:
@@ -373,7 +367,7 @@ class DiffusionTrainer:
         save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
         os.makedirs(save_path, exist_ok=True)
         for index, image in enumerate(images):
-            image_path = os.path.join(save_path, f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}.png')
+            image_path = os.path.join(save_path, f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompts[index]}.png')
             image.save(image_path)
 
         for tracker in self.accelerator.trackers:

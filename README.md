@@ -1,4 +1,4 @@
-<h2 align="center">UniDiffusion</h2>
+<h1 align="center">UniDiffusion</h1>
 <p align="center">Navigate the <strong>Uni</strong>verse of <strong>Diffusion</strong> models with <strong>Uni</strong>fied workflow.</p>
 <p align="center">
     <a href="https://github.com/PRIV-Creation/UniDiffusion/releases">

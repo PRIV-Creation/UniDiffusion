@@ -499,6 +499,7 @@ class UniDiffusionPipeline:
 
         results = dict()
         for evaluator in self.evaluators:
+            self.logger.info('Evaluating {} ...'.format(evaluator.name))
             results.update(evaluator.compute())
             evaluator.reset()
 

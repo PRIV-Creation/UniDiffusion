@@ -5,7 +5,7 @@ from unidiffusion.config import LazyCall as L
 
 train = {
     # common configs
-    'project': 'DiffusionTrainer',
+    'project': 'UniDiffusion',
     'output_dir': './output',
     'pretrained_model_name_or_path': '',
     'revision': None,

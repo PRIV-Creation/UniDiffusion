@@ -37,7 +37,7 @@ inference = {
     'total_num': 10,
     'scheduler': 'DPMSolverMultistepScheduler',
     'num_inference_steps': 25,
-    'guidance_scale': 1.0,
+    'guidance_scale': 7.5,
 }
 
 evaluation = {
@@ -47,7 +47,7 @@ evaluation = {
     'prompts': None,    # using dataset prompt if None
     'scheduler': 'DPMSolverMultistepScheduler',
     'num_inference_steps': 25,
-    'guidance_scale': 1.0,
+    'guidance_scale': 7.5,
     'evaluator': {
         'fid': {'enabled': False, 'feature': 2048, 'real_image_num': 10000},
         'inception_score': {'enabled': False},

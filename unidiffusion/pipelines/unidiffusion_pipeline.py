@@ -99,6 +99,7 @@ class UniDiffusionPipeline:
             self.weight_dtype = torch.bfloat16
 
     def build_dataloader(self):
+        self.logger.info("Building dataloader ... ")
         self.cfg.dataset.tokenizer = self.tokenizer
         self.dataset = instantiate(self.cfg.dataset)
 
@@ -106,6 +107,7 @@ class UniDiffusionPipeline:
         self.dataloader = self.accelerator.prepare(instantiate(self.cfg.dataloader))
 
     def build_model(self):
+        self.logger.info("Building model ... ")
         # build proxy model to store trainable modules
         self.proxy_model = ProxyNetwork()
         self.cfg.vae.proxy_model = self.proxy_model
@@ -131,8 +133,11 @@ class UniDiffusionPipeline:
     def set_placeholders(self):
         placeholders = self.dataset.get_placeholders()
         if placeholders is not None:
+            self.logger.info("Set placeholders:  {placeholders}")
             self.tokenizer.set_placeholders(placeholders)
             self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
+        else:
+            self.logger.info("No placeholders found")
 
     def load_checkpoint(self):
         if self.cfg.train.resume is not None:
@@ -155,8 +160,11 @@ class UniDiffusionPipeline:
                 self.accelerator.load_state(os.path.join(self.cfg.train.output_dir, path))
                 current_iter = int(path.split("-")[1])
                 self.current_iter = current_iter * self.cfg.train.gradient_accumulation_iter
+        else:
+            self.logger.info("Starting a new pipelines run.")
 
     def build_optimizer(self):
+        self.logger.info("Building optimizer ... ")
         self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
 
@@ -165,6 +173,7 @@ class UniDiffusionPipeline:
         self.logger.info(f"Number of trainable parameters: {num_params / 1e6} M")
 
     def build_scheduler(self):
+        self.logger.info("Building scheduler ... ")
         self.cfg.lr_scheduler.optimizer = self.optimizer
         self.cfg.lr_scheduler.num_warmup_steps = self.cfg.train.lr_warmup_iter * self.cfg.train.gradient_accumulation_iter
         self.cfg.lr_scheduler.num_training_steps = self.cfg.train.max_iter * self.cfg.train.gradient_accumulation_iter
@@ -172,6 +181,7 @@ class UniDiffusionPipeline:
         self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
 
     def build_evaluator(self):
+        self.logger.info("Building evaluator ... ")
         for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
             if evaluator_args.pop('enabled'):
                 self.evaluators.append(EVALUATOR[evaluator](**evaluator_args))
@@ -179,6 +189,8 @@ class UniDiffusionPipeline:
         _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
 
     def prepare_training(self):
+        self.logger.info("Preparing training ... ")
+        # prepare proxy model
         self.proxy_model.set_requires_grad(True)
 
         # prepare xformers for unet
@@ -188,8 +200,10 @@ class UniDiffusionPipeline:
         # prepare gradient checkpointing
         if self.cfg.train.gradient_checkpointing:
             if self.unet.trainable:
+                self.logger.info("Unet enable gradient checkpointing")
                 self.unet.enable_gradient_checkpointing()
             if self.text_encoder.trainable:
+                self.logger.info("Text encoder enable gradient checkpointing")
                 self.text_encoder.gradient_checkpointing_enable()
 
         # prepare evaluator
@@ -362,6 +376,7 @@ class UniDiffusionPipeline:
         accelerator.end_training()
 
     def inference(self):
+        self.logger.info('Start inference ... ')
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae, torch.nn.parallel.DistributedDataParallel) else self.vae
@@ -393,6 +408,9 @@ class UniDiffusionPipeline:
         else:
             prompts = [self.dataset[index]['prompt'] for index in range(self.cfg.inference.total_num)]
 
+        # Only show the progress bar once on each machine.
+        progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
+        progress_bar.set_description("Steps")
         images = []
         for prompt in prompts:
             with torch.autocast("cuda"):
@@ -402,6 +420,7 @@ class UniDiffusionPipeline:
                     guidance_scale=self.cfg.inference.guidance_scale,
                     generator=generator
                 ).images[0]
+                progress_bar.update(1)
             images.append(image)
 
         # save images
@@ -429,6 +448,7 @@ class UniDiffusionPipeline:
         torch.cuda.empty_cache()
 
     def evaluate(self):
+        self.logger.info('Start evaluation ... ')
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae,  torch.nn.parallel.DistributedDataParallel) else self.vae
@@ -462,7 +482,9 @@ class UniDiffusionPipeline:
             process_idx = total_idx[self.accelerator.process_index * image_per_process: (self.accelerator.process_index + 1) * image_per_process]
             prompts = [self.dataset[index]['prompt'] for index in process_idx]
 
-        images = []
+        # Only show the progress bar once on each machine.
+        progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
+        progress_bar.set_description("Steps")
         for prompt in prompts:
             with torch.autocast("cuda"):
                 image = pipeline(
@@ -473,10 +495,12 @@ class UniDiffusionPipeline:
                     output_type='pt',
                 ).images[0]
                 _ = [evaluator.update(image[None], real=False) for evaluator in self.evaluators]
+                progress_bar.update(1)
 
         results = dict()
         for evaluator in self.evaluators:
             results.update(evaluator.compute())
             evaluator.reset()
 
+        self.logger.info(f'Evaluation results:\n{results}')
         return results

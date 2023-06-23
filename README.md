@@ -52,7 +52,7 @@ In UniDiffusion, all training methods are decomposed into three dimensions
 It allows we conduct a unified training pipeline with strong config system.
 
 <details>
-<summary> Example for difference in training pipeline </summary>
+<summary> Example for difference in training workflow from other codebases. </summary>
 
 Here is a simple example. In diffusers, training `text-to-image finetune` and `dreambooth` like:
 ```bash
@@ -76,6 +76,10 @@ text_encoder.training_args = {'text_embedding': {'initial': True}}
 # dreambooth with small lr for text-encoder
 unet.training_args = {'': {'mode': 'finetune'}}
 text_encoder.training_args = {'text_embedding': {'initial': True, 'optim_kwargs': {'lr': 1e-6}}}
+```
+and then run
+```bash
+accelerate launch scripts/train.py --config-file /path/to/your/config
 ```
 This facilitates easier customization, combination, and enhancement of methods, and also allows for the comparison of similarities and differences between methods through configuration files.
 </details>
@@ -120,7 +124,7 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 <summary> Supported Personalization Methods</summary>
 
 - [x] [text-to-image finetune](configs/train/text_to_image_finetune.py)
-- [x] [dreambooth](configs/train/text_to_image_finetune.py)
+- [x] [dreambooth](configs/train/dreambooth.py)
 - [x] [lora](configs/train/text_to_image_lora.py)
 - [x] [textual inversion](configs/train/textual_inversion.py)
 - [ ] XTI

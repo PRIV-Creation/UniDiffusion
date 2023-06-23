@@ -67,13 +67,10 @@ class LoRALinearLayer(BaseLoRAModule):
         self.apply_to()
 
     def forward(self, hidden_states):
-        orig_dtype = hidden_states.dtype
-        dtype = self.down.weight.dtype
-
-        down_hidden_states = self.down(hidden_states.to(dtype))
+        down_hidden_states = self.down(hidden_states)
         up_hidden_states = self.up(down_hidden_states)
 
-        return up_hidden_states.to(orig_dtype) * self.scale + self.org_forward(hidden_states)
+        return up_hidden_states * self.scale + self.org_forward(hidden_states)
 
 
 class LoRAConvLayer(BaseLoRAModule):

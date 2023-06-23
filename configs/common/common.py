@@ -32,7 +32,7 @@ train = {
 
 inference = {
     'inference_iter': 5000,
-    'batch_size': 1,    # not used
+    # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'total_num': 10,
     'scheduler': 'DPMSolverMultistepScheduler',
@@ -43,7 +43,7 @@ inference = {
 evaluation = {
     'evaluation_iter': 10000,
     'total_num': 1000,  # synthesis images num
-    'batch_size': 4,
+    # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'scheduler': 'DPMSolverMultistepScheduler',
     'num_inference_steps': 25,

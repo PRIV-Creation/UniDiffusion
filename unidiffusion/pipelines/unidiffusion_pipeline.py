@@ -65,7 +65,8 @@ class UniDiffusionPipeline:
     def default_setup(self):
         # setup log tracker and accelerator
         log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if self.cfg.train[platform]['enabled']]
-        self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
+        if len(log_tracker) >= 1:
+            self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
         self.accelerator = instantiate(self.cfg.accelerator)
 
         if self.accelerator.is_main_process:
@@ -169,6 +170,7 @@ class UniDiffusionPipeline:
         self.logger.info("Building optimizer ... ")
         self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
+        self.optimizer = self.accelerator.prepare(self.optimizer)
 
         # print num of trainable parameters
         num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group['params']])
@@ -181,6 +183,7 @@ class UniDiffusionPipeline:
         self.cfg.lr_scheduler.num_training_steps = self.cfg.train.max_iter * self.cfg.train.gradient_accumulation_iter
 
         self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
+        self.lr_scheduler = self.accelerator.prepare(self.lr_scheduler)
 
     def build_evaluator(self):
         self.logger.info("Building evaluator ... ")
@@ -290,7 +293,7 @@ class UniDiffusionPipeline:
         optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
         while self.current_iter < self.cfg.train.max_iter:
             batch = next(iter(self.dataloader))
-            with accelerator.accumulate(unet):
+            with accelerator.accumulate(self.proxy_model):
                 # ------------------------------------------------------------
                 # 1. Inference
                 # ------------------------------------------------------------

@@ -26,7 +26,7 @@ train = {
     'wandb': {'enabled': False, 'entity': None,},
     'tensorboard': {'enabled': False},
     'comet_ml': {'enabled': False},
-    # pipelines mechanisms
+    # training mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0}
 }
 

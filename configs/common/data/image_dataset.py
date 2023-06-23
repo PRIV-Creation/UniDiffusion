@@ -6,5 +6,5 @@ dataset = L(ImageDataset)(
     path=None,
     placeholder=None,
     inversion_placeholder=None,
-    resoluiton='${train.resolution}',
+    resolution='${train.resolution}',
 )

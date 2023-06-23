@@ -43,7 +43,7 @@ class ISEvaluator(BaseEvaluator, InceptionScore):
         result = super().compute()
         return {
             'inception-score_kl_mean': result[0].item(),
-            'inception-score_kl_std': result[0].item()
+            'inception-score_kl_std': result[1].item()
         }
 
     def __repr__(self):

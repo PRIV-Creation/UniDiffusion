@@ -184,7 +184,7 @@ class UniDiffusionPipeline:
         self.logger.info("Building evaluator ... ")
         for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
             if evaluator_args.pop('enabled'):
-                self.evaluators.append(EVALUATOR[evaluator](**evaluator_args))
+                self.evaluators.append(EVALUATOR[evaluator](**evaluator_args).to(self.accelerator.device))
                 self.logger.info(f'Build {evaluator} evaluator.')
         _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
 
@@ -296,10 +296,10 @@ class UniDiffusionPipeline:
                     # Validation
                     if self.current_iter % self.cfg.inference.inference_iter == 0:
                         self.inference()
-                    # Evaluation
-                    if self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
-                        evaluation_results = self.evaluate()
-                        accelerator.log(evaluation_results, step=self.current_iter)
+                # Evaluation
+                if self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                    evaluation_results = self.evaluate()
+                    accelerator.log(evaluation_results, step=self.current_iter)
 
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()

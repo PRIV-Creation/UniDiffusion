@@ -32,8 +32,8 @@ UniDiffusion is a toolbox that provides state-of-the-art training and inference 
 UniDiffusion is aimed at researchers and users who wish to deeply customize the training of stable diffusion. We hope that this code repository can provide excellent support for future research and application extensions.
 
 If you also want to implement the following things, have fun with UniDiffusion </summary>
-- Train only cross attention (or convolution / feedforward / ...) layer.
-- Set different lr / weight decay / ... for different layers.
+- Train only `cross attention` (or `convolution` / `feedforward` / ...) layer.
+- Set different `lr` / `weight decay` / ... for different layers.
 - Using or supporting PEFT/PETL methods for different layers and easily merging them, e.g., finetune the convolution layer and update attention layer with lora.
 - Train all parameter in stable diffusion, including unet, vae, text_encoder, and automatically save and load.
 
@@ -48,38 +48,37 @@ If you also want to implement the following things, have fun with UniDiffusion <
 ### Unified Training Workflow
 ![workflow](assets/workflow.gif)
 In UniDiffusion, all training methods are decomposed into three dimensions
-- Trainable parameters: which layer or which module will be updated?
-- PEFT/PETL method: how to update them? E.g., finetune, low-rank adaption, adapter, etc.
-- Training process: default to diffuion-denoising, which can be extended like XTI.
+- **Learnable parameters**: which layer or which module will be updated.
+- **PEFT/PETL method**: how to update them. E.g., finetune, low-rank adaption, adapter, etc.
+- **Training process**: default to diffuion-denoising, which can be extended like XTI.
 
 It allows we conduct a unified training pipeline with strong config system.
 
 <details>
 <summary> Example for difference in training pipeline </summary>
+
 Here is a simple example. In diffusers, training `text-to-image finetune` and `dreambooth` like:
 ```bash
-python train_dreambooth.py --arg1 ......
-python train_finetune.py --arg1 ......
+python train_dreambooth.py --arg ......
+python train_finetune.py --arg ......
 ```
 and combining or adjusting some of the methods are difficult (e.g., only training cross attention during dreambooth).
 
 In UniDiffusion, we can easily design our own training arguments in config file:
 ```python
 # text-to-image finetune
-unet.training_args = {'*': {'mode': 'finetune'}}
-# text-to-image finetune with original lora
-unet.training_args = {'*.cross-attention*.(K|V)': {'mode': 'lora'}}
-# text-to-image finetune with lora (whole model)
-unet.training_args = {'*': {'mode': 'lora'}}
-# text-to-image finetune with original lora while finetune residual block with small learning rate
-unet.training_args = {'*.cross-attention*.(K|V)': {'mode': 'lora'}, '*.residual*': {'mode': 'finetune', 'lr_mul': 0.1}}
+unet.training_args = {'': {'mode': 'finetune'}}
+# text-to-image finetune with lora
+unet.training_args = {'': {'mode': 'lora'}}
+# update cross attention with lora
+unet.training_args = {'attn2': {'mode': 'lora'}}
 
 # dreambooth
-unet.training_args = {'*': {'mode': 'finetune'}}
-text_encoder.training_args = {'*', {'mode': 'finetune'}}
+unet.training_args = {'': {'mode': 'finetune'}}
+text_encoder.training_args = {'text_embedding': {'initial': True}}
 # dreambooth with small lr for text-encoder
-unet.training_args = {'*': {'mode': 'finetune'}}
-text_encoder.training_args = {'*', {'mode': 'finetune', 'lr_mul': 0.1}}
+unet.training_args = {'': {'mode': 'finetune'}}
+text_encoder.training_args = {'text_embedding': {'initial': True, 'optim_kwargs': {'lr': 1e-6}}}
 ```
 This facilitates easier customization, combination, and enhancement of methods, and also allows for the comparison of similarities and differences between methods through configuration files.
 </details>
@@ -108,16 +107,6 @@ wandb login
 See [Train Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
 ```bash
 accelerate launch scrits/common.py --config-file configs/train/text_to_image_finetune.py
-```
-
-### [MVP] Train SD with 2 lines of code
-We provide a minimum viable product (MVP) for training stable diffusion with 2 lines of code.
-The YAML file is saved during training and we provide a demo config in `config/demo_config.yaml`.
-
-```python
-from unidiffusion import UniDiffusionPipeline, LazyConfig
-
-UniDiffusionPipeline(LazyConfig.load('config/demo_config.yaml'), training=True).train()
 ```
 
 ### Detailed Demo

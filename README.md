@@ -46,6 +46,7 @@ If you also want to implement the following things, have fun with UniDiffusion <
   - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
   - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
 ### Unified Training Workflow
+![workflow](assets/workflow.gif)
 In UniDiffusion, all training methods are decomposed into three dimensions
 - Trainable parameters: which layer or which module will be updated?
 - PEFT/PETL method: how to update them? E.g., finetune, low-rank adaption, adapter, etc.

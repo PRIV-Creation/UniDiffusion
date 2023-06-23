@@ -1,7 +1,3 @@
-<div align="center">
-
-  <img src="assets/temp_logo.png" width="30%">
-</div>
 <h2 align="center">UniDiffusion</h2>
 <p align="center">Navigate the <strong>Uni</strong>verse of <strong>Diffusion</strong> models with <strong>Uni</strong>fied workflow.</p>
 <p align="center">
@@ -28,6 +24,8 @@
 
 
 ## Introduction
+![workflow](assets/workflow.gif)
+
 UniDiffusion is a toolbox that provides state-of-the-art training and inference algorithms, based on diffusers.
 UniDiffusion is aimed at researchers and users who wish to deeply customize the training of stable diffusion. We hope that this code repository can provide excellent support for future research and application extensions.
 
@@ -46,7 +44,6 @@ If you also want to implement the following things, have fun with UniDiffusion <
   - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
   - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
 ### Unified Training Workflow
-![workflow](assets/workflow.gif)
 In UniDiffusion, all training methods are decomposed into three dimensions
 - **Learnable parameters**: which layer or which module will be updated.
 - **PEFT/PETL method**: how to update them. E.g., finetune, low-rank adaption, adapter, etc.

@@ -105,13 +105,13 @@ accelerate config
 wandb login
 ```
 ## Getting Started
-See [Train Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
+See [Train textual inversion / Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
 ```bash
 accelerate launch scrits/common.py --config-file configs/train/text_to_image_finetune.py
 ```
 
 ### Detailed Demo
-1. [Train Dreambooth / LoRA / text-to-image Finetune.](docs/train_demo.md)
+1. [Train textual inversion / Dreambooth / LoRA / text-to-image Finetune.](docs/train_demo.md)
 2. Customize your training process.
 
 ### [Doing] Tutorial
@@ -139,6 +139,17 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 - [x] [lora](unidiffusion/peft/lora.py)
 - [ ] RepAdapter
 </details>
+
+## TODO
+We are going to add the following features in the future. We also welcome contributions from the community. Feel free to pull requests or open an issue to discuss ideas for new features.
+
+- **Methods**:
+  - [ ] preservation of class semantic priors (dreambooth).
+  - [ ] XTI & Custom Diffusion.
+  - [ ] RepAdapter and LyCoris.
+- **Features**:
+  - [ ] Merge PEFT to original model.
+  - [ ] Convert model to diffusers and webui format.
 
 ## Acknowledge
 - Diffusion Trainer is built based on [diffusers](https://github.com/huggingface/diffusers).

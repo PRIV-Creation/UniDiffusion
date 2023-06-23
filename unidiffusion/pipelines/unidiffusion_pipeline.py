@@ -27,10 +27,12 @@ from diffusers import (
 class UniDiffusionPipeline:
     tokenizer = None
     noise_scheduler = None
+    dataset = None
     text_encoder = None
+    proxy_model = None
     vae = None
     unet = None
-    unet_ema = None
+    ema_model = None
     weight_dtype = None
     logger = None
     scheduler = None
@@ -44,9 +46,6 @@ class UniDiffusionPipeline:
     evaluators = []
 
     def __init__(self, cfg, training):
-        self.dataset = None
-        self.proxy_model = None
-        self.ema_unet = None
         self.cfg = cfg
         self.training = training
         self.default_setup()
@@ -123,12 +122,13 @@ class UniDiffusionPipeline:
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
         self.models = [self.vae, self.text_encoder, self.unet]
-        
+
         # EMA
         if self.cfg.train.use_ema:
-            self.ema_unet = EMAModel(self.unet, model_cls=type(self.unet), model_config=self.unet.config)
+            self.logger.info('Use ema model')
+            self.ema_model = EMAModel(self.proxy_model)
         else:
-            self.ema_unet = None
+            self.ema_model = None
 
     def set_placeholders(self):
         placeholders = self.dataset.get_placeholders()
@@ -157,9 +157,11 @@ class UniDiffusionPipeline:
                 self.cfg.train.resume = None
             else:
                 self.logger.info(f"Resuming from checkpoint {path}")
-                self.accelerator.load_state(os.path.join(self.cfg.train.output_dir, path))
-                current_iter = int(path.split("-")[1])
-                self.current_iter = current_iter * self.cfg.train.gradient_accumulation_iter
+                checkpoint_path = os.path.join(self.cfg.train.output_dir, path)
+                self.accelerator.load_state(checkpoint_path)
+                if self.ema_model is not None:
+                    self.ema_model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'ema.pt')))
+                self.current_iter = int(path.split("-")[1])
         else:
             self.logger.info("Starting a new pipelines run.")
 
@@ -227,7 +229,7 @@ class UniDiffusionPipeline:
         else:
             self.text_encoder.requires_grad_(False)
             self.text_encoder.to(self.accelerator.device, dtype=self.weight_dtype)
-
+        self.ema_model.to(self.accelerator.device)
         self.proxy_model = self.accelerator.prepare(self.proxy_model)
 
         # prepare tracker
@@ -292,15 +294,24 @@ class UniDiffusionPipeline:
         while self.current_iter < self.cfg.train.max_iter:
             batch = next(iter(self.dataloader))
             with accelerator.accumulate(unet):
+                # ------------------------------------------------------------
+                # 1. Inference
+                # ------------------------------------------------------------
                 if accelerator.is_main_process:
                     # Validation
-                    if self.current_iter % self.cfg.inference.inference_iter == 0:
+                    if self.cfg.inference.inference_iter > 0 and \
+                            self.current_iter % self.cfg.inference.inference_iter == 0:
                         self.inference()
-                # Evaluation
-                if self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                # ------------------------------------------------------------
+                # 2. Evaluation
+                # ------------------------------------------------------------
+                if len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
                     evaluation_results = self.evaluate()
                     accelerator.log(evaluation_results, step=self.current_iter)
 
+                # ------------------------------------------------------------
+                # 3. Diffusion and Denoising
+                # ------------------------------------------------------------
                 # Convert images to latent space
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
                 latents = latents * vae.config.scaling_factor
@@ -329,6 +340,9 @@ class UniDiffusionPipeline:
                 else:
                     raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
+                # ------------------------------------------------------------
+                # 5. Calculate loss and backward
+                # ------------------------------------------------------------
                 if self.cfg.train.snr.enabled:
                     loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
                 else:
@@ -342,7 +356,9 @@ class UniDiffusionPipeline:
                 lr_scheduler.step()
                 optimizer.zero_grad()
 
-                # make sure not update any embedding weights besides the newly added token
+                # ------------------------------------------------------------
+                # 6. Keep not trainable text embedding unchanged
+                # ------------------------------------------------------------
                 if self.text_encoder.start_token_idx is not None:
                     with torch.no_grad():
                         index_no_updates = torch.ones((len(self.tokenizer),), dtype=torch.bool)
@@ -352,22 +368,32 @@ class UniDiffusionPipeline:
                         ] = orig_embeds_params[index_no_updates]
 
                 if accelerator.sync_gradients:
-                    progress_bar.update(1)
-                    self.current_iter += 1
+                    # --------------------------------------------------------
+                    # 7. Update ema
+                    # --------------------------------------------------------
+                    if self.ema_model is not None:
+                        self.ema_model.step(self.proxy_model.parameters())
+                    # --------------------------------------------------------
+                    # 8. Save checkpoint
+                    # --------------------------------------------------------
                     if accelerator.is_main_process:
+                        # Save checkpoint
                         if self.current_iter % self.cfg.train.checkpointing_iter == 0:
-                            # Save checkpoint
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
                             # Save Unet/VAE/Text Encoder
                             accelerator.save_state(save_path)
-                            # Save Tokenizer
-                            # ......
-                            # Save EMA
-                            # ......
+                            # Save EMA model
+                            if self.ema_model is not None:
+                                torch.save(self.ema_model.state_dict(), os.path.join(save_path, 'ema.pt'))
                             self.logger.info(f"Saved state to {save_path}")
+
+                    progress_bar.update(1)
+                    self.current_iter += 1
+
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=self.current_iter)
+
         accelerator.wait_for_everyone()
         if accelerator.is_main_process:
             # Save last
@@ -377,6 +403,10 @@ class UniDiffusionPipeline:
 
     def inference(self):
         self.logger.info('Start inference ... ')
+        if self.ema_model is not None:
+            self.ema_model.store(self.proxy_model.parameters())
+            self.ema_model.copy_to(self.proxy_model.parameters())
+
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae, torch.nn.parallel.DistributedDataParallel) else self.vae
@@ -444,11 +474,17 @@ class UniDiffusionPipeline:
                     }
                 )
 
+        if self.ema_model is not None:
+            self.ema_model.restore(self.proxy_model.parameters())
+
         del pipeline
         torch.cuda.empty_cache()
 
     def evaluate(self):
         self.logger.info('Start evaluation ... ')
+        if self.ema_model is not None:
+            self.ema_model.store(self.proxy_model.parameters())
+            self.ema_model.copy_to(self.proxy_model.parameters())
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae,  torch.nn.parallel.DistributedDataParallel) else self.vae
@@ -502,6 +538,12 @@ class UniDiffusionPipeline:
             self.logger.info('Evaluating {} ...'.format(evaluator.name))
             results.update(evaluator.compute())
             evaluator.reset()
+
+        if self.ema_model is not None:
+            self.ema_model.restore(self.proxy_model.parameters())
+
+        del pipeline
+        torch.cuda.empty_cache()
 
         self.logger.info(f'Evaluation results:\n{results}')
         return results

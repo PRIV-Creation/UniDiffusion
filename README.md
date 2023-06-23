@@ -151,7 +151,7 @@ If you use this toolbox in your research or wish to refer to the baseline result
 - Citing **UniDiffusion**:
 
 ```BibTeX
-@misc{priv2022diffusion,
+@misc{pu2022diffusion,
   author =       {Pu Cao, Tianrui Huang, Lu Yang, Qing Song},
   title =        {UniDiffusion},
   howpublished = {\url{https://github.com/PRIV-Creation/UniDiffusion}},

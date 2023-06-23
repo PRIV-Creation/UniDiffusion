@@ -37,12 +37,13 @@ If you also want to implement the following things, have fun with UniDiffusion <
 
 **Note:** UniDiffusion is still under development. Some modules are borrowed from other code repositories and have not been tested yet, especially the components that are not enabled by default in the configuration system. We are working hard to improve this project.
 
-## Features
+## ⭐ Features
 - **Modular Design**. UniDiffusion is designed with a modular architecture. The modular design enables easy implementation of new methods. 
 - **Config System**. LazyConfig System for more flexible syntax and cleaner config files.
 - **Easy to Use**.
-  - Distributed Training: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
-  - Experiment Tracker: Using [wandb](https://wandb.ai/) to log all training information.
+  - **Distributed Training**: Using [accelerate](https://github.com/huggingface/accelerate) to support all distributed training environment. 
+  - **Experiment Tracker**: Using [wandb](https://wandb.ai/) to log all training information.
+  - **Distributed Evaluation**: Evaluate ✅FID, ✅IS, CLIP Score during training
 ### Unified Training Workflow
 In UniDiffusion, all training methods are decomposed into three dimensions
 - **Learnable parameters**: which layer or which module will be updated.
@@ -90,7 +91,7 @@ In UniDiffusion, we provide a regular matching system for module selection. It a
 ### Powerful Support for PEFT/PETL Methods
 We provide a powerful support for PEFT/PETL methods. See [PEFT/PETL Methods](docs/PEFT.md) for more details.
 
-## Installation
+## 🌏 Installation
 1. Install prerequisites
 - Python 3.10
 - Pytorch 2.0 + CUDA11.8
@@ -104,7 +105,7 @@ pip install -e requirements.txt
 accelerate config
 wandb login
 ```
-## Getting Started
+## 🎉 Getting Started
 See [Train textual inversion / Dreambooth / LoRA / text-to-image Finetune](docs/train_demo.md) for details.
 ```bash
 accelerate launch scrits/common.py --config-file configs/train/text_to_image_finetune.py
@@ -119,7 +120,7 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 2. [TODO] Supporting new PETL method.
 3. [TODO] Supporting new training pipeline.
 
-## Model Zoo
+## 👑 Model Zoo
 <details open>
 <summary> Supported Personalization Methods</summary>
 
@@ -140,7 +141,7 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 - [ ] RepAdapter
 </details>
 
-## TODO
+## 📝 TODO
 We are going to add the following features in the future. We also welcome contributions from the community. Feel free to pull requests or open an issue to discuss ideas for new features.
 
 - **Methods**:

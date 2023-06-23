@@ -271,9 +271,6 @@ class UniDiffusionPipeline:
             except:
                 if model.module.trainable:
                     model.train()
-    def model_eval(self):
-        for model in self.models:
-            model.eval()
 
     def train(self):
         self.model_train()
@@ -393,12 +390,6 @@ class UniDiffusionPipeline:
                 logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=self.current_iter)
-
-        accelerator.wait_for_everyone()
-        if accelerator.is_main_process:
-            # Save last
-            # ......
-            pass
         accelerator.end_training()
 
     def inference(self):

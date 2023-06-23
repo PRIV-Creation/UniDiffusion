@@ -198,12 +198,22 @@ class UniDiffusionPipeline:
             self.logger.info(evaluator)
 
         # prepare models
-        for model in self.models:
-            if model.trainable:
-                model = self.accelerator.prepare(model)
-            else:
-                model.requires_grad_(False)
-                model.to(self.accelerator.device, dtype=self.weight_dtype)
+        if self.unet.trainable:
+            self.unet = self.accelerator.prepare(self.unet)
+        else:
+            self.unet.requires_grad_(False)
+            self.unet.to(self.accelerator.device, dtype=self.weight_dtype)
+        if self.vae.trainable:
+            self.vae = self.accelerator.prepare(self.vae)
+        else:
+            self.vae.requires_grad_(False)
+            self.vae.to(self.accelerator.device, dtype=self.weight_dtype)
+        if self.text_encoder.trainable:
+            self.text_encoder = self.accelerator.prepare(self.text_encoder)
+        else:
+            self.text_encoder.requires_grad_(False)
+            self.text_encoder.to(self.accelerator.device, dtype=self.weight_dtype)
+
         self.proxy_model = self.accelerator.prepare(self.proxy_model)
 
         # prepare tracker
@@ -239,9 +249,12 @@ class UniDiffusionPipeline:
 
     def model_train(self):
         for model in self.models:
-            if model.trainable:
-                model.train()
-
+            try:
+                if model.trainable:
+                    model.train()
+            except:
+                if model.module.trainable:
+                    model.train()
     def model_eval(self):
         for model in self.models:
             model.eval()
@@ -284,7 +297,6 @@ class UniDiffusionPipeline:
                 # Sample a random timestep for each image
                 timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
                 timesteps = timesteps.long()
-
                 # Add noise to the latents according to the noise magnitude at each timestep
                 # (this is the forward diffusion process)
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
@@ -350,9 +362,9 @@ class UniDiffusionPipeline:
         accelerator.end_training()
 
     def inference(self):
-        unet = self.accelerator.unwrap_model(self.unet) if self.unet.trainable else self.unet
-        text_encoder = self.accelerator.unwrap_model(self.text_encoder) if self.text_encoder.trainable else self.text_encoder
-        vae = self.accelerator.unwrap_model(self.vae) if self.vae.trainable else self.vae
+        unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
+        text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
+        vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae, torch.nn.parallel.DistributedDataParallel) else self.vae
 
         # create pipeline
         pipeline = StableDiffusionPipeline.from_pretrained(
@@ -417,10 +429,9 @@ class UniDiffusionPipeline:
         torch.cuda.empty_cache()
 
     def evaluate(self):
-        unet = self.accelerator.unwrap_model(self.unet) if self.unet.trainable else self.unet
-        text_encoder = self.accelerator.unwrap_model(
-            self.text_encoder) if self.text_encoder.trainable else self.text_encoder
-        vae = self.accelerator.unwrap_model(self.vae) if self.vae.trainable else self.vae
+        unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
+        text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
+        vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae,  torch.nn.parallel.DistributedDataParallel) else self.vae
 
         # create pipeline
         pipeline = StableDiffusionPipeline.from_pretrained(

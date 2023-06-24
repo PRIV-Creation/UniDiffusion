@@ -44,6 +44,7 @@ class UniDiffusionPipeline:
     models = None
     current_iter = 0
     evaluators = []
+    config = None
 
     def __init__(self, cfg, training):
         self.cfg = cfg
@@ -67,6 +68,7 @@ class UniDiffusionPipeline:
         log_tracker = [platform for platform in ['wandb', 'tensorboard', 'comet_ml'] if self.cfg.train[platform]['enabled']]
         if len(log_tracker) >= 1:
             self.cfg.accelerator.log_with = log_tracker[0]  # todo: support multiple loggers
+        self.config = OmegaConf.to_container(self.cfg, resolve=True)
         self.accelerator = instantiate(self.cfg.accelerator)
 
         if self.accelerator.is_main_process:
@@ -247,7 +249,7 @@ class UniDiffusionPipeline:
                     os.path.split(output_dir)[-2],
                 }
                 init_kwargs['wandb'] = wandb_kwargs
-            self.accelerator.init_trackers(self.cfg.train.project, config=vars(self.cfg), init_kwargs=init_kwargs)
+            self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
 
     def prepare_inference(self):
         self.proxy_model.set_requires_grad(False)

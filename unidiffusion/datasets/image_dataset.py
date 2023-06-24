@@ -20,7 +20,10 @@ class ImageDataset(BaseDataset):
         self.inversion_placeholder = inversion_placeholder
         self.resolution = resolution
 
-        self.image_paths = glob.glob(f'{path}/**/*.png', recursive=True)
+        images = []
+        for ext in ['jpg', 'png']:
+            images.extend(glob.glob(f'{path}/**/*.{ext}', recursive=True))
+        self.image_paths = images
         self.image_paths.sort()
 
         self.num_instance_images = len(self.image_paths)

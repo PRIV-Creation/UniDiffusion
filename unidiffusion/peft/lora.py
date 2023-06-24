@@ -75,7 +75,8 @@ class LoRALinearLayer(BaseLoRAModule):
 
 class LoRAConvLayer(BaseLoRAModule):
 
-    def __init__(self, org_module: nn.Module, org_name: str, rank=4, network_alpha=None, multiplier=1.0, dropout=0., use_cp=False):
+    def __init__(self, org_module: nn.Module, org_name: str, rank=4, network_alpha=None, scale=1.0, dropout=0.,
+                 use_cp=False):
         assert isinstance(org_module, nn.Conv2d)
         super().__init__(org_module, org_name)
         in_dim = org_module.in_channels
@@ -101,7 +102,7 @@ class LoRAConvLayer(BaseLoRAModule):
         if type(network_alpha) == torch.Tensor:
             network_alpha = network_alpha.detach().float().numpy()  # without casting, bf16 causes error
         network_alpha = rank if network_alpha is None or network_alpha == 0 else network_alpha
-        self.scale = network_alpha / rank
+        self.scale = scale
         self.register_buffer('alpha', torch.tensor(network_alpha))
 
         # same as microsoft's
@@ -109,7 +110,6 @@ class LoRAConvLayer(BaseLoRAModule):
         torch.nn.init.zeros_(self.lora_up.weight)
         if self.cp:
             torch.nn.init.kaiming_uniform_(self.lora_mid.weight, a=math.sqrt(5))
-        self.multiplier = multiplier
 
         self.apply_to()
 
@@ -121,11 +121,11 @@ class LoRAConvLayer(BaseLoRAModule):
     def forward(self, x):
         if self.cp:
             return self.org_forward(x) + self.dropout(
-                self.lora_up(self.lora_mid(self.lora_down(x)))* self.multiplier * self.scale
+                self.lora_up(self.lora_mid(self.lora_down(x))) * self.scale
             )
         else:
             return self.org_forward(x) + self.dropout(
-                self.lora_up(self.lora_down(x)) * self.multiplier * self.scale
+                self.lora_up(self.lora_down(x)) * self.scale
             )
 
 

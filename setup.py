@@ -6,7 +6,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     author="PRIV-Creation",
-    author_email="priv@bupt.edu.cn",
+    author_email="caopu@bupt.edu.cn",
     description="Diffusion pipelines toolbox.",
     license="Apache-2.0 license",
     keywords="diffusion, stable-diffusion, dreambooth, lora",

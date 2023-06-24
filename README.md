@@ -1,17 +1,14 @@
 <h1 align="center">UniDiffusion</h1>
 <p align="center">Navigate the <strong>Uni</strong>verse of <strong>Diffusion</strong> models with <strong>Uni</strong>fied workflow.</p>
 <p align="center">
-    <a href="https://github.com/PRIV-Creation/UniDiffusion/releases">
-        <img alt="release" src="https://img.shields.io/github/v/release/PRIV-Creation/UniDiffusion">
-    </a>
     <a href="https://github.com/PRIV-Creation/Awesome-Diffusion-Personalization">
         <img alt="docs" src="https://img.shields.io/badge/docs-Doing-blue">
     </a>
     <a href="">
-        <img alt="docs" src="https://img.shields.io/badge/related_papers-awesome_diffusion_personalization-green">
+        <img alt="list" src="https://img.shields.io/badge/related_papers-awesome_diffusion_personalization-green">
     </a>
     <a href="https://github.com/PRIV-Creation/UniDiffusion/blob/main/LICENSE">
-        <img alt="GitHub" src="https://img.shields.io/github/license/PRIV-Creation/UniDiffusion.svg?color=blue">
+        <img alt="GitHub" src="https://img.shields.io/github/license/PRIV-Creation/UniDiffusion.svg?color=yellow">
     </a>
     <a href="https://github.com/PRIV-Creation/UniDiffusion/">
         <img alt="open issues" src="https://img.shields.io/badge/python-3.10-blue.svg">
@@ -151,6 +148,11 @@ We are going to add the following features in the future. We also welcome contri
 - **Features**:
   - [ ] Merge PEFT to original model.
   - [ ] Convert model to diffusers and webui format.
+  - [ ] Webui extension.
+
+## Contribution
+We welcome contributions from the open-source community!
+
 
 ## Acknowledge
 - Diffusion Trainer is built based on [diffusers](https://github.com/huggingface/diffusers).

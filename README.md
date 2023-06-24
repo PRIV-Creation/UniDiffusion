@@ -1,10 +1,10 @@
 <h1 align="center">UniDiffusion</h1>
 <p align="center">Navigate the <strong>Uni</strong>verse of <strong>Diffusion</strong> models with <strong>Uni</strong>fied workflow.</p>
 <p align="center">
-    <a href="https://github.com/PRIV-Creation/Awesome-Diffusion-Personalization">
+    <a href="">
         <img alt="docs" src="https://img.shields.io/badge/docs-Doing-blue">
     </a>
-    <a href="">
+    <a href="https://github.com/PRIV-Creation/Awesome-Diffusion-Personalization">
         <img alt="list" src="https://img.shields.io/badge/related_papers-awesome_diffusion_personalization-green">
     </a>
     <a href="https://github.com/PRIV-Creation/UniDiffusion/blob/main/LICENSE">

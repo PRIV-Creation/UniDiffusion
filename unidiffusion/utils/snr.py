@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 
 
 def compute_snr(timesteps, noise_scheduler):

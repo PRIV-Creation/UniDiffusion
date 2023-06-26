@@ -119,7 +119,6 @@ class UniDiffusionPipeline:
         # build models and noise scheduler
         self.vae = instantiate(self.cfg.vae)
         self.tokenizer = instantiate(self.cfg.tokenizer)
-        self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
         self.text_encoder = instantiate(self.cfg.text_encoder)
         self.unet = instantiate(self.cfg.unet)
         self.noise_scheduler = instantiate(self.cfg.noise_scheduler)

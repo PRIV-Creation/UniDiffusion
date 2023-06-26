@@ -4,7 +4,7 @@ from unidiffusion.config import LazyConfig, default_argument_parser
 
 
 def main(cfg):
-    trainer = UniDiffusionPipeline(cfg, training=True)
+    trainer = UniDiffusionPipeline(cfg, training=False)
     trainer.inference()
 
 
@@ -16,5 +16,6 @@ if __name__ == '__main__':
         cfg.train.resume = 'latest'
     if args.config_file.endswith('yaml'):
         cfg.train.output_dir = os.path.dirname(args.config_file)
+    cfg.only_inference = True
     main(cfg)
 

@@ -31,6 +31,7 @@ train = {
 }
 
 inference = {
+    'save_path': None,
     'inference_iter': 5000,
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None

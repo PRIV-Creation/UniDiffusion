@@ -121,7 +121,8 @@ class UniDiffusionPipeline:
         self.tokenizer = instantiate(self.cfg.tokenizer)
         self.text_encoder = instantiate(self.cfg.text_encoder)
         self.unet = instantiate(self.cfg.unet)
-        self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
+        if not self.cfg.get('only_inference', False):
+            self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
         self.models = [self.vae, self.text_encoder, self.unet]
 
@@ -135,7 +136,7 @@ class UniDiffusionPipeline:
     def set_placeholders(self):
         placeholders = self.dataset.get_placeholders()
         if placeholders is not None:
-            self.logger.info("Set placeholders:  {placeholders}")
+            self.logger.info(f"Set placeholders:  {placeholders}")
             self.tokenizer.set_placeholders(placeholders)
             self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
         else:
@@ -146,7 +147,7 @@ class UniDiffusionPipeline:
             if self.cfg.train.resume != "latest":
                 path = os.path.basename(self.cfg.train.resume)
             else:
-                # Get the mos recent checkpoint
+                # Get the most recent checkpoint
                 dirs = os.listdir(self.cfg.train.output_dir)
                 dirs = [d for d in dirs if d.startswith("checkpoint")]
                 dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
@@ -162,7 +163,7 @@ class UniDiffusionPipeline:
                 checkpoint_path = os.path.join(self.cfg.train.output_dir, path)
                 self.accelerator.load_state(checkpoint_path)
                 if self.ema_model is not None:
-                    self.ema_model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'ema.pt')))
+                    self.ema_model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'ema.pt'), map_location='cpu'))
                 self.current_iter = int(path.split("-")[1])
         else:
             self.logger.info("Starting a new pipelines run.")
@@ -251,6 +252,15 @@ class UniDiffusionPipeline:
             self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
 
     def prepare_inference(self):
+        # prepare models
+        self.unet.requires_grad_(False)
+        self.unet.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.vae.requires_grad_(False)
+        self.vae.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.text_encoder.requires_grad_(False)
+        self.text_encoder.to(self.accelerator.device, dtype=self.weight_dtype)
+        self.ema_model.to(self.accelerator.device)
+        self.proxy_model = self.accelerator.prepare(self.proxy_model)
         self.proxy_model.set_requires_grad(False)
         # prepare xformers for unet
         if self.cfg.train.use_xformers:
@@ -417,7 +427,7 @@ class UniDiffusionPipeline:
             torch_dtype=self.weight_dtype,
             safety_checker=None,
         )
-        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+        pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
@@ -449,7 +459,8 @@ class UniDiffusionPipeline:
             images.append(image)
 
         # save images
-        save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
+        if (save_path := self.cfg.inference.save_path) is None:
+            save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
         os.makedirs(save_path, exist_ok=True)
         for index, image in enumerate(images):
             image_path = os.path.join(save_path, f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompts[index]}.png')
@@ -495,7 +506,7 @@ class UniDiffusionPipeline:
             torch_dtype=self.weight_dtype,
             safety_checker=None,
         )
-        pipeline.scheduler = DPMSolverMultistepScheduler.from_config(pipeline.scheduler.config)
+        pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 

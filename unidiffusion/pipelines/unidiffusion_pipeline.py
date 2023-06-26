@@ -451,9 +451,8 @@ class UniDiffusionPipeline:
             with torch.autocast("cuda"):
                 image = pipeline(
                     prompt,
-                    num_inference_steps=self.cfg.inference.num_inference_steps,
-                    guidance_scale=self.cfg.inference.guidance_scale,
-                    generator=generator
+                    generator=generator,
+                    **self.cfg.inference.pipeline_kwargs
                 ).images[0]
                 progress_bar.update(1)
             images.append(image)
@@ -531,10 +530,9 @@ class UniDiffusionPipeline:
             with torch.autocast("cuda"):
                 image = pipeline(
                     prompt,
-                    num_inference_steps=self.cfg.evaluation.num_inference_steps,
-                    guidance_scale=self.cfg.evaluation.guidance_scale,
                     generator=generator,
                     output_type='pt',
+                    **self.cfg.evaluation.pipeline_kwargs
                 ).images[0]
                 _ = [evaluator.update(image[None], real=False) for evaluator in self.evaluators]
                 progress_bar.update(1)

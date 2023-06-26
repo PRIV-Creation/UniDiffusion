@@ -37,8 +37,12 @@ inference = {
     'prompts': None,    # using dataset prompt if None
     'total_num': 10,
     'scheduler': 'DPMSolverMultistepScheduler',
-    'num_inference_steps': 25,
-    'guidance_scale': 7.5,
+    'pipeline_kwargs': {
+        # arguments for pipeline.forward().
+        'num_inference_steps': 25,
+        'guidance_scale': 7.5,
+    },
+
 }
 
 evaluation = {
@@ -47,12 +51,15 @@ evaluation = {
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'scheduler': 'DPMSolverMultistepScheduler',
-    'num_inference_steps': 25,
-    'guidance_scale': 7.5,
+    'pipeline_kwargs': {
+        # arguments for pipeline.forward().
+        'num_inference_steps': 25,
+        'guidance_scale': 7.5,
+    },
     'evaluator': {
         'fid': {'enabled': False, 'feature': 2048, 'real_image_num': 10000},
         'inception_score': {'enabled': False},
-    }
+    },
 }
 
 accelerator = L(Accelerator)(

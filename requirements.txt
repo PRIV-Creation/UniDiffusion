@@ -1,6 +1,7 @@
 cloudpickle
 datasets
 iopath
+hydra-core
 termcolor
 torch
 diffusers[torch]

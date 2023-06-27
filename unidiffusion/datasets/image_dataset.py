@@ -1,5 +1,6 @@
 import torch
 import glob
+import random
 from .dataset import BaseDataset
 from torchvision import transforms
 from PIL import Image
@@ -13,6 +14,8 @@ class ImageDataset(BaseDataset):
         placeholder,
         inversion_placeholder,
         resolution=512,
+        is_training=True,
+        drop_prob=0.,
     ):
         super().__init__()
         self.tokenizer = tokenizer
@@ -47,6 +50,8 @@ class ImageDataset(BaseDataset):
 
         self.preprocess_train = preprocess_train
 
+        self.drop_prob = drop_prob if is_training else 0.
+
     def get_placeholders(self):
         return [self.inversion_placeholder]
 
@@ -57,8 +62,11 @@ class ImageDataset(BaseDataset):
         example = {}
         instance_image = Image.open(self.image_paths[index % self.num_instance_images])
 
-        placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
-        prompt = f'a photo of {placeholder}'
+        if random.random() < self.drop_prob:
+            prompt = ""
+        else:
+            placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
+            prompt = f'a photo of {placeholder}'
         example['prompt'] = prompt
         example["pixel_values"] = self.image_transforms(instance_image)
         example["input_ids"] = self.tokenizer(

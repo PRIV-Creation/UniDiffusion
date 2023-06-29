@@ -1,4 +1,8 @@
+import warnings
+from pathlib import Path
+import hashlib
 import diffusers
+from diffusers import DiffusionPipeline
 import os
 import numpy as np
 import wandb
@@ -8,6 +12,7 @@ import random
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
+from torch.utils.data import Dataset
 import transformers
 from accelerate.utils import set_seed
 from omegaconf import OmegaConf
@@ -51,6 +56,7 @@ class UniDiffusionPipeline:
         self.training = training
         self.default_setup()
         self.build_model()
+        self.prepare_db()
         self.build_dataloader()
         self.set_placeholders()
         self.load_checkpoint()
@@ -194,6 +200,77 @@ class UniDiffusionPipeline:
                 self.evaluators.append(EVALUATOR[evaluator](**evaluator_args).to(self.accelerator.device))
                 self.logger.info(f'Build {evaluator} evaluator.')
         _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
+
+    def prepare_db(self):
+        db_cfg = self.cfg.train.db
+        if not db_cfg.with_prior_preservation:
+            if db_cfg.class_data_dir is not None:
+                warnings.warn("You need not use --class_data_dir without --with_prior_preservation.")
+            if db_cfg.class_prompt is not None:
+                warnings.warn("You need not use --class_prompt without --with_prior_preservation.")
+            return
+
+        if db_cfg.class_data_dir is None:
+            raise ValueError("You must specify a data directory for class images.")
+        if db_cfg.class_prompt is None:
+            raise ValueError("You must specify prompt for class images.")   
+        # Generate class images if prior preservation is enabled.
+        class_images_dir = Path(db_cfg.class_data_dir)
+        if not class_images_dir.exists():
+            class_images_dir.mkdir(parents=True)
+        cur_class_images = len(list(class_images_dir.iterdir()))
+
+        if cur_class_images < db_cfg.num_class_images:
+            torch_dtype = torch.float16 if self.accelerator.device.type == "cuda" else torch.float32
+            if db_cfg.prior_generation_precision == "fp32":
+                torch_dtype = torch.float32
+            elif db_cfg.prior_generation_precision == "fp16":
+                torch_dtype = torch.float16
+            elif db_cfg.prior_generation_precision == "bf16":
+                torch_dtype = torch.bfloat16
+            pipeline = DiffusionPipeline.from_pretrained(
+                'runwayml/stable-diffusion-v1-5',
+                torch_dtype=torch_dtype,
+                safety_checker=None,
+            )
+            pipeline.set_progress_bar_config(disable=True)
+
+            num_new_images = db_cfg.num_class_images - cur_class_images
+            self.logger.info(f"Number of class images to sample: {num_new_images}.")
+            class PromptDataset(Dataset):
+                "A simple dataset to prepare the prompts to generate class images on multiple GPUs."
+
+                def __init__(self, prompt, num_samples):
+                    self.prompt = prompt
+                    self.num_samples = num_samples
+
+                def __len__(self):
+                    return self.num_samples
+
+                def __getitem__(self, index):
+                    example = {}
+                    example["prompt"] = self.prompt
+                    example["index"] = index
+                    return example
+            sample_dataset = PromptDataset(db_cfg.class_prompt, num_new_images)
+            sample_dataloader = torch.utils.data.DataLoader(sample_dataset, batch_size=4)
+
+            sample_dataloader = self.accelerator.prepare(sample_dataloader)
+            pipeline.to(self.accelerator.device)
+
+            for example in tqdm(
+                sample_dataloader, desc="Generating class images", disable=not self.accelerator.is_local_main_process
+            ):
+                images = pipeline(example["prompt"]).images
+
+                for i, image in enumerate(images):
+                    hash_image = hashlib.sha1(image.tobytes()).hexdigest()
+                    image_filename = class_images_dir / f"{example['index'][i] + cur_class_images}-{hash_image}.jpg"
+                    image.save(image_filename)
+
+            del pipeline
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
     def prepare_training(self):
         self.logger.info("Preparing training ... ")
@@ -354,10 +431,24 @@ class UniDiffusionPipeline:
                 # ------------------------------------------------------------
                 # 5. Calculate loss and backward
                 # ------------------------------------------------------------
-                if self.cfg.train.snr.enabled:
-                    loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
-                else:
+                if self.cfg.train.db.with_prior_preservation:
+                    # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
+                    model_pred, model_pred_prior = torch.chunk(model_pred, 2, dim=0)
+                    target, target_prior = torch.chunk(target, 2, dim=0)
+
+                    # Compute instance loss
                     loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
+
+                    # Compute prior loss
+                    prior_loss = F.mse_loss(model_pred_prior.float(), target_prior.float(), reduction="mean")
+
+                    # Add the prior loss to the instance loss.
+                    loss = loss + self.cfg.train.db.prior_loss_weight * prior_loss
+                else:
+                    if self.cfg.train.snr.enabled:
+                        loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
+                    else:
+                        loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:

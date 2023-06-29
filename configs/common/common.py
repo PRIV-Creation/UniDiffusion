@@ -27,7 +27,16 @@ train = {
     'tensorboard': {'enabled': False},
     'comet_ml': {'enabled': False},
     # training mechanisms
-    'snr': {'enabled': False, 'snr_gamma': 5.0}
+    'snr': {'enabled': False, 'snr_gamma': 5.0},
+    # use dreambooth regularization
+    'db': {
+        'with_prior_preservation': False,
+        "prior_generation_precision": 'fp16',
+        'prior_loss_weight': 1.0,
+        'class_data_dir': None,
+        'class_prompt': None,
+        'num_class_images': 100
+    },
 }
 
 inference = {

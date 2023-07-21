@@ -24,7 +24,6 @@ from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
 from diffusers import (
-    DPMSolverMultistepScheduler,
     StableDiffusionPipeline,
 )
 
@@ -56,10 +55,11 @@ class UniDiffusionPipeline:
         self.training = training
         self.default_setup()
         self.build_model()
-        self.prepare_db()
-        self.build_dataloader()
-        self.set_placeholders()
-        self.load_checkpoint()
+        if training:
+            self.prepare_db()
+            self.build_dataloader()
+            self.set_placeholders()
+
         if training:
             self.build_optimizer()
             self.build_scheduler()
@@ -68,6 +68,8 @@ class UniDiffusionPipeline:
             self.print_training_state()
         else:
             self.prepare_inference()
+
+        self.load_checkpoint()
 
     def default_setup(self):
         # setup log tracker and accelerator
@@ -202,6 +204,9 @@ class UniDiffusionPipeline:
         _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
 
     def prepare_db(self):
+        if 'db' not in self.cfg.train:
+            return None
+
         db_cfg = self.cfg.train.db
         if not db_cfg.with_prior_preservation:
             if db_cfg.class_data_dir is not None:

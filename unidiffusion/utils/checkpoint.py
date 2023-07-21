@@ -3,7 +3,10 @@ import transformers
 import os
 import torch
 from unidiffusion.peft.proxy import ProxyNetwork
+from unidiffusion.utils.logger import setup_logger
 
+
+logger = setup_logger(__name__)
 
 UNET_CLASSES = (
     diffusers.UNet2DConditionModel,
@@ -39,9 +42,6 @@ def save_model_hook(models, weights, output_dir):
     for model in models:
         if isinstance(model, PROXY_MODEL_CLASS):
             torch.save(model.state_dict(), os.path.join(output_dir, "proxy_model.pt"))
-        elif isinstance(model, EMA_CLASSES):
-            model_type = get_model_type(model)
-            model.save_pretrained(os.path.join(output_dir, f"{model_type}_ema"))
         # make sure to pop weight so that corresponding model is not saved again
         weights.pop()
 
@@ -51,15 +51,6 @@ def load_model_hook(models, input_dir):
         # pop models so that they are not loaded again
         model = models.pop()
         if isinstance(model, PROXY_MODEL_CLASS):
+            logger.info("Loading proxy model from %s", input_dir)
             weight = torch.load(os.path.join(input_dir, "proxy_model.pt"), map_location='cpu')
             model.load_state_dict(weight)
-        elif isinstance(model, EMA_CLASSES):
-            model_type = get_model_type(model)
-            model_name = f"{model_type}_ema"
-            load_model = type(model).from_pretrained(input_dir, subfolder=model_name)
-            if model_type == 'unet':
-                model.register_to_config(**load_model.config)
-            else:
-                model.config = load_model.config
-            model.load_state_dict(load_model.state_dict())
-            del load_model

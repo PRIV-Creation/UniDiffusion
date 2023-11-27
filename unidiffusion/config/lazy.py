@@ -483,3 +483,15 @@ class LazyConfig:
             return black.format_str(py_str, mode=black.Mode())
         except black.InvalidInput:
             return py_str
+
+    @staticmethod
+    def merge_additional_config(main_config, additional_config):
+        def merge_additional_config(main_config, additional_config):
+            for key, value in additional_config.items():
+                if key not in main_config:
+                    main_config[key] = value
+                elif isinstance(value, (dict, DictConfig)):
+                    merge_additional_config(main_config[key], value)
+        merge_additional_config(main_config, additional_config)
+
+        return main_config

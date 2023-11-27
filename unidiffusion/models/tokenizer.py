@@ -9,4 +9,5 @@ class CLIPTokenizer_DT(CLIPTokenizer, BaseModel):
         return super().from_pretrained(*args, **kwargs)
 
     def set_placeholders(self, placeholders):
-        num_added_tokens = self.add_tokens(placeholders)
+        for p in placeholders:
+            self.add_tokens(p)

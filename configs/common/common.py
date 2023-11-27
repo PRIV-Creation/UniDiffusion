@@ -1,4 +1,3 @@
-
 from accelerate import Accelerator
 from accelerate.utils import ProjectConfiguration
 from unidiffusion.config import LazyCall as L
@@ -28,22 +27,21 @@ train = {
     'comet_ml': {'enabled': False},
     # training mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0},
-    # use dreambooth regularization
-    'db': {
-        'with_prior_preservation': False,
-        "prior_generation_precision": 'fp16',
-        'prior_loss_weight': 1.0,
-        'class_data_dir': None,
-        'class_prompt': None,
-        'num_class_images': 100
-    },
+    # Null-text Mode
+    "null_text": False,
+}
+
+checkpoint = {
+    'load_optimizer': True,
+    'load_scheduler': True,
 }
 
 inference = {
     'save_path': None,
+    'skip_error': False,
     'inference_iter': 5000,
-    # 'batch_size': 1,    # not used
-    'prompts': None,    # using dataset prompt if None
+    'unbiased_uncond': False,
+    'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
     'total_num': 10,
     'scheduler': 'DPMSolverMultistepScheduler',
     'pipeline_kwargs': {
@@ -56,7 +54,9 @@ inference = {
 
 evaluation = {
     'evaluation_iter': 10000,
+    'skip_error': True,
     'total_num': 1000,  # synthesis images num
+    'unbiased_uncond': False,
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'scheduler': 'DPMSolverMultistepScheduler',
@@ -64,10 +64,20 @@ evaluation = {
         # arguments for pipeline.forward().
         'num_inference_steps': 25,
         'guidance_scale': 7.5,
+        'guidance_scale_ori': 7.5,
     },
+    "save_image": True,
+    "save_path": True,
     'evaluator': {
         'fid': {'enabled': False, 'feature': 2048, 'real_image_num': 10000},
         'inception_score': {'enabled': False},
+        'clip_score': {
+            'enabled': False,
+            'clip_model': 'openai/clip-vit-large-patch14',
+            'prompts': None,      # use evaluation prompts if None.
+            'prompts_ori': None,      # use evaluation prompts if None.
+            'total_num': 100,     # only used when prompts is not None.
+        },
     },
 }
 

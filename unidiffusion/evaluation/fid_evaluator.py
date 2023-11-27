@@ -12,13 +12,14 @@ class FIDEvaluator(BaseEvaluator, FrechetInceptionDistance):
     name = 'FID'
 
     def __init__(self, real_image_num, reset_real_features=False, normalize=True, **kwargs):
-        super().__init__(reset_real_features=reset_real_features, normalize=normalize, **kwargs)
+        super().__init__(reset_real_features=reset_real_features, normalize=normalize)
         self.real_image_num = real_image_num
 
     def before_train(self, dataset, accelerator):
         # random select different data for each process
         random.seed(0)
-        total_idx = random.sample(range(len(dataset)), min(self.real_image_num, len(dataset)))
+        total_idx = list(range(len(dataset)))[:self.real_image_num]
+        # total_idx = random.sample(range(len(dataset)), min(self.real_image_num, len(dataset)))
         image_per_process = len(total_idx) // accelerator.num_processes
         process_idx = total_idx[accelerator.process_index * image_per_process: (accelerator.process_index + 1) * image_per_process]
 
@@ -31,6 +32,10 @@ class FIDEvaluator(BaseEvaluator, FrechetInceptionDistance):
         for i in process_idx:
             self.update((dataset[i]["pixel_values"].unsqueeze(0).to(accelerator.device) + 1) / 2, real=True)
             progress_bar.update(1)
+
+
+    def update(self, image, real, **kwargs):
+        super().update(image, real)
 
     def compute(self):
         result = super().compute()

@@ -14,6 +14,7 @@ def default_argument_parser():
     """
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,)
     parser.add_argument("--config-file", default="", metavar="FILE", help="path to config file")
+    parser.add_argument("--save_diffusers_path", default="", help="path to save diffusers pipeline")
     parser.add_argument(
         "opts",
         help='"path.key=value"',

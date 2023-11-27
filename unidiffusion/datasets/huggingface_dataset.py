@@ -68,3 +68,5 @@ class HuggingFaceDataset(BaseDataset):
             example.pop("text")
         return example
 
+    def get_prompt(self, item):
+        return self.dataset[item]["prompt"]

@@ -22,7 +22,9 @@ class ProxyNetwork(torch.nn.Module):
         self.unet = torch.nn.ModuleList()
         self.vae = torch.nn.ModuleList()
         self.text_encoder = torch.nn.ModuleList()
-        self.text_embedding = None
+        self.text_embeddings = None
+        self.added_tokens_encoder = None
+        self.added_tokens_decoder = None
 
     def set_requires_grad(self, requires_grad=True):
         for param in self.parameters():

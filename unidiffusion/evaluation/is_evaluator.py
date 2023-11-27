@@ -12,7 +12,7 @@ class ISEvaluator(BaseEvaluator, InceptionScore):
     name = 'InceptionScore'
 
     def __init__(self, real_image_num=0, normalize=True, **kwargs):
-        super().__init__(normalize=normalize, **kwargs)
+        super().__init__(normalize=normalize)
         self.real_image_num = real_image_num
 
     def before_train(self, dataset, accelerator):
@@ -36,7 +36,7 @@ class ISEvaluator(BaseEvaluator, InceptionScore):
             self.update((dataset[i]["pixel_values"].unsqueeze(0).to(accelerator.device) + 1) / 2, real=True)
             progress_bar.update(1)
 
-    def update(self, image, real):
+    def update(self, image, **kwargs):
         super().update(image)
 
     def compute(self):

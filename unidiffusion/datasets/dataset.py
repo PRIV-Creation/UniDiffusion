@@ -8,6 +8,9 @@ class BaseDataset(Dataset):
     def __getitem__(self, item):
         pass
 
+    def get_prompt(self, item):
+        pass
+
     def get_placeholders(self):
         pass
 

@@ -9,7 +9,11 @@ numpy
 Pillow
 transformers
 accelerate
+wandb
+torchmetrics
+torch-fidelity
 setuptools
+bitsandbytes
 PyYAML
 omegaconf
 torchvision

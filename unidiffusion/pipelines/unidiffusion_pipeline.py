@@ -1,21 +1,20 @@
-import warnings
-from pathlib import Path
-import hashlib
 import diffusers
-from diffusers import DiffusionPipeline
 import os
 import numpy as np
 import wandb
 from unidiffusion.config import instantiate
 from tqdm import tqdm
 import random
+import time
+import torchvision
+from accelerate import PartialState
 import torch
 import torch.nn.functional as F
 import torch.utils.checkpoint
-from torch.utils.data import Dataset
 import transformers
 from accelerate.utils import set_seed
 from omegaconf import OmegaConf
+from diffusers import UNet2DConditionModel
 from diffusers.training_utils import EMAModel
 from unidiffusion.peft.proxy import ProxyNetwork
 from unidiffusion.config import LazyConfig
@@ -23,12 +22,15 @@ from unidiffusion.evaluation import EVALUATOR
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
+from unidiffusion.models.diffusers_pipeline import StableDiffusionUnbiasedPipeline
 from diffusers import (
     StableDiffusionPipeline,
 )
 
 
 class UniDiffusionPipeline:
+    cfg = None
+    training = None
     tokenizer = None
     noise_scheduler = None
     dataset = None
@@ -36,6 +38,7 @@ class UniDiffusionPipeline:
     proxy_model = None
     vae = None
     unet = None
+    unet_init = None
     ema_model = None
     weight_dtype = None
     logger = None
@@ -49,27 +52,10 @@ class UniDiffusionPipeline:
     current_iter = 0
     evaluators = []
     config = None
+    unbiased_uncond = False
 
-    def __init__(self, cfg, training):
-        self.cfg = cfg
-        self.training = training
-        self.default_setup()
-        self.build_model()
-        if training:
-            self.prepare_db()
-            self.build_dataloader()
-            self.set_placeholders()
-
-        if training:
-            self.build_optimizer()
-            self.build_scheduler()
-            self.build_evaluator()
-            self.prepare_training()
-            self.print_training_state()
-        else:
-            self.prepare_inference()
-
-        self.load_checkpoint()
+    def __init__(self, cfg):
+        pass
 
     def default_setup(self):
         # setup log tracker and accelerator
@@ -79,7 +65,7 @@ class UniDiffusionPipeline:
         self.config = OmegaConf.to_container(self.cfg, resolve=True)
         self.accelerator = instantiate(self.cfg.accelerator)
 
-        if self.accelerator.is_main_process:
+        if self.accelerator.is_main_process and self.training:
             os.makedirs(self.cfg.train.output_dir, exist_ok=True)
             # save all configs
             LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
@@ -92,8 +78,8 @@ class UniDiffusionPipeline:
         os.environ['ACCELERATE_PROCESS_ID'] = str(self.accelerator.process_index)
         self.logger.info(self.accelerator.state)
         if self.accelerator.is_local_main_process:
-            transformers.utils.logging.set_verbosity_warning()
-            diffusers.utils.logging.set_verbosity_info()
+            transformers.utils.logging.set_verbosity_error()
+            diffusers.utils.logging.set_verbosity_error()
         else:
             transformers.utils.logging.set_verbosity_error()
             diffusers.utils.logging.set_verbosity_error()
@@ -132,6 +118,14 @@ class UniDiffusionPipeline:
         if not self.cfg.get('only_inference', False):
             self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
+        # build origin unet
+        self.unbiased_uncond = (self.cfg.inference.unbiased_uncond or self.cfg.evaluation.unbiased_uncond)
+        if self.unbiased_uncond:
+            self.unet_init = UNet2DConditionModel.from_pretrained(
+                pretrained_model_name_or_path=self.cfg.train.pretrained_model_name_or_path,
+                subfolder="unet",
+            )
+
         self.models = [self.vae, self.text_encoder, self.unet]
 
         # EMA
@@ -146,20 +140,23 @@ class UniDiffusionPipeline:
         if placeholders is not None:
             self.logger.info(f"Set placeholders:  {placeholders}")
             self.tokenizer.set_placeholders(placeholders)
-            self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
         else:
             self.logger.info("No placeholders found")
+        self.text_encoder.set_placeholders(placeholders, self.tokenizer, self.proxy_model)
 
     def load_checkpoint(self):
         if self.cfg.train.resume is not None:
             if self.cfg.train.resume != "latest":
-                path = os.path.basename(self.cfg.train.resume)
+                path = os.path.split(self.cfg.train.resume)
+                path = os.path.split(path[0])[-1] if path[-1] == "" else path[-1]
+                checkpoint_path = self.cfg.train.resume
             else:
                 # Get the most recent checkpoint
                 dirs = os.listdir(self.cfg.train.output_dir)
                 dirs = [d for d in dirs if d.startswith("checkpoint")]
                 dirs = sorted(dirs, key=lambda x: int(x.split("-")[1]))
                 path = dirs[-1] if len(dirs) > 0 else None
+                checkpoint_path = os.path.join(self.cfg.train.output_dir, path)
 
             if path is None:
                 self.logger.warn(
@@ -168,19 +165,35 @@ class UniDiffusionPipeline:
                 self.cfg.train.resume = None
             else:
                 self.logger.info(f"Resuming from checkpoint {path}")
-                checkpoint_path = os.path.join(self.cfg.train.output_dir, path)
-                self.accelerator.load_state(checkpoint_path)
+                if not self.cfg.checkpoint.load_optimizer:
+                    scaler, self.accelerator.scaler = self.accelerator.scaler, None
+                    self.accelerator.load_state(checkpoint_path)
+                    self.accelerator.scaler = scaler
+                else:
+                    self.accelerator.load_state(checkpoint_path)
+
                 if self.ema_model is not None:
-                    self.ema_model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'ema.pt'), map_location='cpu'))
+                    if os.path.exists(ema_model_path := os.path.join(checkpoint_path, 'ema.pt')):
+                        self.ema_model.load_state_dict(torch.load(ema_model_path, map_location='cpu'))
+                    else:
+                        self.logger.info(f"EMA model checkpoint doesn't exist from checkpoint {path}!")
                 self.current_iter = int(path.split("-")[1])
         else:
             self.logger.info("Starting a new pipelines run.")
+
+        # prepare optimizer and scheduler if they are not resumed.
+        if not self.cfg.checkpoint.load_optimizer:
+            self.optimizer = self.accelerator.prepare(self.optimizer)
+        if not self.cfg.checkpoint.load_scheduler:
+            self.lr_scheduler = self.accelerator.prepare(self.lr_scheduler)
 
     def build_optimizer(self):
         self.logger.info("Building optimizer ... ")
         self.cfg.optimizer.params = self.proxy_model.params_group
         self.optimizer = instantiate(OmegaConf.to_container(self.cfg.optimizer), convert=False)  # not convert list to ListConfig
-        self.optimizer = self.accelerator.prepare(self.optimizer)
+
+        if self.cfg.checkpoint.load_optimizer:
+            self.optimizer = self.accelerator.prepare(self.optimizer)
 
         # print num of trainable parameters
         num_params = sum([p.numel() for params_group in self.optimizer.param_groups for p in params_group['params']])
@@ -193,15 +206,23 @@ class UniDiffusionPipeline:
         self.cfg.lr_scheduler.num_training_steps = self.cfg.train.max_iter * self.cfg.train.gradient_accumulation_iter
 
         self.lr_scheduler = instantiate(self.cfg.lr_scheduler)
-        self.lr_scheduler = self.accelerator.prepare(self.lr_scheduler)
+
+        if self.cfg.checkpoint.load_scheduler:
+            self.lr_scheduler = self.accelerator.prepare(self.lr_scheduler)
 
     def build_evaluator(self):
         self.logger.info("Building evaluator ... ")
         for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
-            if evaluator_args.pop('enabled'):
+            if evaluator_args.get('enabled'):
                 self.evaluators.append(EVALUATOR[evaluator](**evaluator_args).to(self.accelerator.device))
                 self.logger.info(f'Build {evaluator} evaluator.')
-        _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
+        # _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
+
+    def prepare_null_text(self):
+        if not self.cfg.train.null_text:
+            return None
+        # prepare null_text
+
 
     def prepare_db(self):
         if 'db' not in self.cfg.train:
@@ -210,9 +231,9 @@ class UniDiffusionPipeline:
         db_cfg = self.cfg.train.db
         if not db_cfg.with_prior_preservation:
             if db_cfg.class_data_dir is not None:
-                warnings.warn("You need not use --class_data_dir without --with_prior_preservation.")
+                self.logger.warn("You need not use --class_data_dir without --with_prior_preservation.")
             if db_cfg.class_prompt is not None:
-                warnings.warn("You need not use --class_prompt without --with_prior_preservation.")
+                self.logger.warn("You need not use --class_prompt without --with_prior_preservation.")
             return
 
         if db_cfg.class_data_dir is None:
@@ -316,7 +337,8 @@ class UniDiffusionPipeline:
         else:
             self.text_encoder.requires_grad_(False)
             self.text_encoder.to(self.accelerator.device, dtype=self.weight_dtype)
-        self.ema_model.to(self.accelerator.device)
+        if self.ema_model is not None:
+            self.ema_model.to(self.accelerator.device)
         self.proxy_model = self.accelerator.prepare(self.proxy_model)
 
         # prepare tracker
@@ -332,8 +354,13 @@ class UniDiffusionPipeline:
                 }
                 init_kwargs['wandb'] = wandb_kwargs
             self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
+            if self.cfg.train.wandb.enabled:
+                wandb.define_metric("inference/step")
+                wandb.define_metric("inference/*", step_metric="inference/step")
+        else:
+            self.accelerator.init_trackers(self.cfg.train.project)
 
-    def prepare_inference(self):
+    def prepare_inference(self, prepare_evaluator=False):
         # prepare models
         self.unet.requires_grad_(False)
         self.unet.to(self.accelerator.device, dtype=self.weight_dtype)
@@ -347,6 +374,11 @@ class UniDiffusionPipeline:
         # prepare xformers for unet
         if self.cfg.train.use_xformers:
             self.unet.enable_xformers_memory_efficient_attention()
+        # prepare evaluator
+        if prepare_evaluator:
+            for evaluator in self.evaluators:
+                evaluator.before_train(self.dataset, self.accelerator)
+                self.logger.info(evaluator)
 
     def print_training_state(self):
         total_batch_size = self.cfg.dataloader.batch_size * self.accelerator.num_processes * self.cfg.train.gradient_accumulation_iter
@@ -372,7 +404,8 @@ class UniDiffusionPipeline:
         self.model_train()
 
         # keep original embeddings as reference
-        if (start_token_idx := self.text_encoder.start_token_idx) is not None:
+
+        if (start_token_idx := self.accelerator.unwrap_model(self.text_encoder).start_token_idx) is not None:
             orig_embeds_params = self.accelerator.unwrap_model(self.text_encoder).get_input_embeddings().weight.data.clone()
         else:
             orig_embeds_params = None
@@ -382,6 +415,9 @@ class UniDiffusionPipeline:
         progress_bar.update(self.current_iter)
         progress_bar.set_description("Steps")
 
+        if self.ema_model is not None:
+            self.ema_model.to(self.accelerator.device)
+
         accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler
         optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
         while self.current_iter < self.cfg.train.max_iter:
@@ -390,24 +426,37 @@ class UniDiffusionPipeline:
                 # ------------------------------------------------------------
                 # 1. Inference
                 # ------------------------------------------------------------
-                if accelerator.is_main_process:
-                    # Validation
-                    if self.cfg.inference.inference_iter > 0 and \
-                            self.current_iter % self.cfg.inference.inference_iter == 0:
+                if self.cfg.inference.inference_iter > 0 and self.current_iter % self.cfg.inference.inference_iter == 0:
+                    if self.cfg.inference.skip_error:
+                        try:
+                            self.inference()
+                        except:
+                            pass
+                    else:
                         self.inference()
                 # ------------------------------------------------------------
                 # 2. Evaluation
                 # ------------------------------------------------------------
-                if len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
-                    evaluation_results = self.evaluate()
-                    accelerator.log(evaluation_results, step=self.current_iter)
-
+                if self.cfg.evaluation.evaluation_iter > 0 and len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                    if self.cfg.evaluation.skip_error:
+                        try:
+                            evaluation_results = self.evaluate()
+                            evaluation_results["step"] = self.current_iter
+                            accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
+                        except:
+                            pass
+                    else:
+                        evaluation_results = self.evaluate()
+                        evaluation_results["step"] = self.current_iter
+                        accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
                 # ------------------------------------------------------------
                 # 3. Diffusion and Denoising
                 # ------------------------------------------------------------
                 # Convert images to latent space
+                time_vae_start = time.time()
                 latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
                 latents = latents * vae.config.scaling_factor
+                time_vae_end = time.time()
 
                 # Sample noise that we'll add to the latents
                 noise = torch.randn_like(latents)
@@ -420,10 +469,14 @@ class UniDiffusionPipeline:
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
                 # Get the text embedding for conditioning
+                time_text_start = time.time()
                 encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=self.weight_dtype)
+                time_text_end = time.time()
 
                 # Predict the noise residual
+                time_unet_start = time.time()
                 model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                time_unet_end = time.time()
 
                 # Get the target for loss depending on the prediction type
                 if noise_scheduler.config.prediction_type == "epsilon":
@@ -436,7 +489,7 @@ class UniDiffusionPipeline:
                 # ------------------------------------------------------------
                 # 5. Calculate loss and backward
                 # ------------------------------------------------------------
-                if self.cfg.train.db.with_prior_preservation:
+                if 'db' in self.cfg.train and self.cfg.train.db.with_prior_preservation:
                     # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
                     model_pred, model_pred_prior = torch.chunk(model_pred, 2, dim=0)
                     target, target_prior = torch.chunk(target, 2, dim=0)
@@ -455,6 +508,7 @@ class UniDiffusionPipeline:
                     else:
                         loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
+                time_update_start = time.time()
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
                     accelerator.clip_grad_norm_(self.proxy_model.parameters(), self.cfg.train.max_grad_norm)
@@ -462,11 +516,12 @@ class UniDiffusionPipeline:
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
+                time_update_end = time.time()
 
                 # ------------------------------------------------------------
                 # 6. Keep not trainable text embedding unchanged
                 # ------------------------------------------------------------
-                if self.text_encoder.start_token_idx is not None:
+                if self.accelerator.unwrap_model(self.text_encoder).start_token_idx is not None:
                     with torch.no_grad():
                         index_no_updates = torch.ones((len(self.tokenizer),), dtype=torch.bool)
                         index_no_updates[start_token_idx:] = False
@@ -485,7 +540,8 @@ class UniDiffusionPipeline:
                     # --------------------------------------------------------
                     if accelerator.is_main_process:
                         # Save checkpoint
-                        if self.current_iter % self.cfg.train.checkpointing_iter == 0:
+                        if self.current_iter % self.cfg.train.checkpointing_iter == 0 or \
+                                self.current_iter == (self.cfg.train.max_iter - 1):
                             save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
                             # Save Unet/VAE/Text Encoder
                             accelerator.save_state(save_path)
@@ -497,7 +553,9 @@ class UniDiffusionPipeline:
                     progress_bar.update(1)
                     self.current_iter += 1
 
-                logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0]}
+                logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0],
+                        "vae": time_vae_end - time_vae_start, "text": time_text_end - time_text_start,
+                        "unet": time_unet_end - time_unet_start, "update": time_update_end - time_update_start}
                 progress_bar.set_postfix(**logs)
                 accelerator.log(logs, step=self.current_iter)
         accelerator.end_training()
@@ -507,22 +565,36 @@ class UniDiffusionPipeline:
         if self.ema_model is not None:
             self.ema_model.store(self.proxy_model.parameters())
             self.ema_model.copy_to(self.proxy_model.parameters())
+            self.ema_model.to("cpu") # to save GPU memory
+        torch.cuda.empty_cache()
 
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae, torch.nn.parallel.DistributedDataParallel) else self.vae
 
         # create pipeline
-        pipeline = StableDiffusionPipeline.from_pretrained(
-            self.cfg.train.pretrained_model_name_or_path,
-            text_encoder=text_encoder,
-            tokenizer=self.tokenizer,
-            unet=unet,
-            vae=vae,
-            revision=self.cfg.train.revision,
-            torch_dtype=self.weight_dtype,
-            safety_checker=None,
-        )
+        pipeline_kwargs = {
+            'text_encoder': text_encoder,
+            'tokenizer': self.tokenizer,
+            'unet': unet,
+            'vae': vae,
+            'revision': self.cfg.train.revision,
+            'torch_dtype': self.weight_dtype,
+            'safety_checker': None,
+        }
+
+        if self.cfg.inference.unbiased_uncond:
+            pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
+                self.cfg.train.pretrained_model_name_or_path,
+                **pipeline_kwargs
+            )
+            pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
+        else:
+            pipeline = StableDiffusionPipeline.from_pretrained(
+                self.cfg.train.pretrained_model_name_or_path,
+                **pipeline_kwargs
+            )
+
         pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
@@ -531,76 +603,122 @@ class UniDiffusionPipeline:
         if (seed := self.cfg.train.seed) is None:
             generator = None
         else:
-            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed)
+            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed + self.accelerator.process_index)
 
         # inference prompts
         if self.cfg.inference.prompts is not None:
-            prompts = [self.cfg.inference.prompts] * self.cfg.inference.total_num
+            if os.path.isfile(self.cfg.inference.prompts):
+                with open(self.cfg.inference.prompts, 'r') as f:
+                    prompts = [line.strip() for line in f.readlines()]
+                    prompts = [p for p in prompts if p != ""]
+                    prompts = (prompts * (self.cfg.inference.total_num // len(prompts) + 1))[:self.cfg.inference.total_num]
+                    prompts.sort()
+            else:
+                prompts = [self.cfg.inference.prompts] * self.cfg.inference.total_num
         else:
             prompts = [self.dataset[index]['prompt'] for index in range(self.cfg.inference.total_num)]
-
-        # Only show the progress bar once on each machine.
-        progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
-        progress_bar.set_description("Steps")
-        images = []
-        for prompt in prompts:
-            with torch.autocast("cuda"):
-                image = pipeline(
-                    prompt,
-                    generator=generator,
-                    **self.cfg.inference.pipeline_kwargs
-                ).images[0]
-                progress_bar.update(1)
-            images.append(image)
 
         # save images
         if (save_path := self.cfg.inference.save_path) is None:
             save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
         os.makedirs(save_path, exist_ok=True)
-        for index, image in enumerate(images):
-            image_path = os.path.join(save_path, f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompts[index]}.png')
-            image.save(image_path)
 
-        for tracker in self.accelerator.trackers:
-            if tracker.name == "tensorboard":
-                np_images = np.stack([np.asarray(img) for img in images])
-                tracker.writer.add_images("validation", np_images, self.current_iter, dataformats="NHWC")
-            if tracker.name == "wandb":
-                tracker.log(
-                    {
-                        "validation": [
-                            wandb.Image(image, caption=f"{i}: {prompt}") for i, (image, prompt) in
-                            enumerate(zip(images, prompts))
-                        ]
-                    }
-                )
+        distributed_state = PartialState()
+        with distributed_state.split_between_processes(prompts) as prompt_per_card:
+            # Only show the progress bar once on each machine.
+            progress_bar = tqdm(range(len(prompt_per_card)), disable=not self.accelerator.is_local_main_process)
+            progress_bar.set_description("Steps")
+            images = []
+            for index, prompt in enumerate(prompt_per_card):
+                with torch.autocast("cuda"):
+                    image = pipeline(
+                        prompt,
+                        generator=generator,
+                        output_type='pt',
+                        **self.cfg.inference.pipeline_kwargs
+                    ).images[0]
+                    progress_bar.update(1)
+                image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompt}.png')
+                torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
+                if self.training:
+                    images.append(image)
 
-        if self.ema_model is not None:
-            self.ema_model.restore(self.proxy_model.parameters())
+        if self.training:
+            images = torch.stack(images)
+            images = self.accelerator.gather(images)
+            if self.accelerator.is_main_process:
+                for tracker in self.accelerator.trackers:
+                    if tracker.name == "tensorboard":
+                        np_images = np.asarray(images)
+                        tracker.writer.add_images("inference", np_images, self.current_iter, dataformats="NHWC")
+                    if tracker.name == "wandb":
+                        self.logger.info("Logging images to wandb")
+                        tracker.log(
+                            {
+                                "validation": [
+                                    wandb.Image(image, caption=f"{i}: {prompt}") for i, (image, prompt) in
+                                    enumerate(zip(images, prompts))
+                                ]
+                            }
+                        )
+                        self.logger.info("Logging images to wandb finish!")
 
+            if self.ema_model is not None:
+                self.ema_model.restore(self.proxy_model.parameters())
+                self.ema_model.to(self.accelerator.device)
+
+        self.accelerator.wait_for_everyone()
+        del images
         del pipeline
         torch.cuda.empty_cache()
 
     def evaluate(self):
+        torch.cuda.empty_cache()
         self.logger.info('Start evaluation ... ')
+
+        # Load all evaluator to device
+        _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
+
         if self.ema_model is not None:
             self.ema_model.store(self.proxy_model.parameters())
             self.ema_model.copy_to(self.proxy_model.parameters())
+            self.ema_model.to("cpu") # to save GPU memory
+
         unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
         text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
         vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae,  torch.nn.parallel.DistributedDataParallel) else self.vae
 
+        # save images
+        if self.cfg.evaluation.save_image:
+            save_image = True
+            if (save_path := self.cfg.evaluation.save_path) is None:
+                save_path = os.path.join(self.cfg.train.output_dir, f'evaluation-{self.current_iter:06d}')
+            os.makedirs(save_path, exist_ok=True)
+        else:
+            save_image = False
+            save_path = None
+
         # create pipeline
-        pipeline = StableDiffusionPipeline.from_pretrained(
-            self.cfg.train.pretrained_model_name_or_path,
-            text_encoder=text_encoder,
-            tokenizer=self.tokenizer,
-            unet=unet,
-            vae=vae,
-            revision=self.cfg.train.revision,
-            torch_dtype=self.weight_dtype,
-            safety_checker=None,
-        )
+        pipeline_kwargs = {
+            'text_encoder': text_encoder,
+            'tokenizer': self.tokenizer,
+            'unet': unet,
+            'vae': vae,
+            'revision': self.cfg.train.revision,
+            'torch_dtype': self.weight_dtype,
+            'safety_checker': None,
+        }
+        if self.cfg.evaluation.unbiased_uncond:
+            pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
+                self.cfg.train.pretrained_model_name_or_path,
+                **pipeline_kwargs
+            )
+            pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
+        else:
+            pipeline = StableDiffusionPipeline.from_pretrained(
+                self.cfg.train.pretrained_model_name_or_path,
+                **pipeline_kwargs
+            )
         pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
@@ -610,19 +728,46 @@ class UniDiffusionPipeline:
 
         # random select different data for each process
         if self.cfg.evaluation.prompts is not None:
-            prompts = [self.cfg.evaluation.prompts] * self.cfg.evaluation.total_num
+            if os.path.isfile(self.cfg.evaluation.prompts):
+                with open(self.cfg.evaluation.prompts, 'r') as f:
+                    prompts = [line.strip() for line in f.readlines()]
+                    prompts = [p for p in prompts if p != ""]
+                prompts = (prompts * (self.cfg.evaluation.total_num // len(prompts) + 1))[:self.cfg.evaluation.total_num]
+                prompts.sort()
+            else:
+                prompts = [self.cfg.evaluation.prompts] * (self.cfg.evaluation.total_num // self.accelerator.num_processes)
         else:
             # to keep the same prompts with real images and different between processes
             random.seed(0)
-            total_idx = random.sample(range(len(self.dataset)), min(self.cfg.evaluation.total_num, len(self.dataset)))
+            total_idx = random.sample(list(range(len(self.dataset))) * (int(self.cfg.evaluation.total_num / len(self.dataset)) + 1), self.cfg.evaluation.total_num)
             image_per_process = len(total_idx) // self.accelerator.num_processes
             process_idx = total_idx[self.accelerator.process_index * image_per_process: (self.accelerator.process_index + 1) * image_per_process]
-            prompts = [self.dataset[index]['prompt'] for index in process_idx]
+            prompts = [self.dataset.get_prompt(index) for index in process_idx]
 
+        # If no prompts are specified for clip score, use the evaluation prompts.
+        if self.cfg.evaluation.evaluator.clip_score.prompts is not None \
+                and self.cfg.evaluation.evaluator.clip_score.enabled:
+            calculate_clip_score_by_general_prompt = False
+            with open(self.cfg.evaluation.evaluator.clip_score.prompts, 'r') as f:
+                clip_score_prompts = [line.strip() for line in f.readlines()]
+                clip_score_prompts = [p for p in clip_score_prompts if p != ""]
+                clip_score_prompts = (clip_score_prompts * (self.cfg.evaluation.evaluator.clip_score.total_num // (len(clip_score_prompts) * self.accelerator.num_processes) + 1))[:self.cfg.evaluation.evaluator.clip_score.total_num // self.accelerator.num_processes]
+        else:
+            calculate_clip_score_by_general_prompt = True
+
+        if self.cfg.evaluation.evaluator.clip_score.prompts_ori is not None \
+                and self.cfg.evaluation.evaluator.clip_score.enabled:
+            with open(self.cfg.evaluation.evaluator.clip_score.prompts_ori, 'r') as f:
+                clip_score_prompts_ori = [line.strip() for line in f.readlines()]
+                clip_score_prompts_ori = [p for p in clip_score_prompts_ori if p != ""]
+                clip_score_prompts_ori = (clip_score_prompts_ori * (self.cfg.evaluation.evaluator.clip_score.total_num // (len(clip_score_prompts_ori) * self.accelerator.num_processes) + 1))[:self.cfg.evaluation.evaluator.clip_score.total_num // self.accelerator.num_processes]
+
+        # GCFG
+        guidance_scale_ori = self.cfg.evaluation.pipeline_kwargs.pop("guidance_scale_ori", None)
         # Only show the progress bar once on each machine.
         progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
         progress_bar.set_description("Steps")
-        for prompt in prompts:
+        for index, prompt in enumerate(prompts):
             with torch.autocast("cuda"):
                 image = pipeline(
                     prompt,
@@ -630,20 +775,92 @@ class UniDiffusionPipeline:
                     output_type='pt',
                     **self.cfg.evaluation.pipeline_kwargs
                 ).images[0]
-                _ = [evaluator.update(image[None], real=False) for evaluator in self.evaluators]
                 progress_bar.update(1)
+                _ = [evaluator.update(
+                    image=image[None],
+                    text=prompt,                                                  # used for CLIP Score
+                    calculate_clip_score=calculate_clip_score_by_general_prompt,  # used for CLIP Score
+                    real=False,                                                   # used for FID
+                ) for evaluator in self.evaluators]
+            if save_image:
+                image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}_{prompt}.png')
+                torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
 
+        # Evaluate CLIP Score
+        if not calculate_clip_score_by_general_prompt:
+            generator = torch.Generator(device=self.accelerator.device).manual_seed(
+                self.cfg.train.seed + self.accelerator.process_index)
+            progress_bar = tqdm(
+                range(len(clip_score_prompts)),
+                desc="Evaluating CLIP Score",
+                disable=not self.accelerator.is_local_main_process
+            )
+            progress_bar.set_description("Steps")
+            for index, (prompt, prompt_ori) in enumerate(zip(clip_score_prompts, clip_score_prompts_ori)):
+                with torch.autocast("cuda"):
+                    image = pipeline(
+                        [prompt, prompt_ori],
+                        generator=generator,
+                        output_type='pt',
+                        guidance_scale_ori=guidance_scale_ori,
+                        **self.cfg.evaluation.pipeline_kwargs
+                    ).images[0]
+
+                    _ = [evaluator.update_by_evaluator_name(
+                        name="CLIP_Score",
+                        image=image[None],
+                        text=prompt,                    # used for CLIP Score
+                        calculate_clip_score=True,      # used for CLIP Score
+                    ) for evaluator in self.evaluators]
+                    progress_bar.update(1)
+                if save_image:
+                    os.makedirs(os.path.join(save_path, f'{prompt_ori}'), exist_ok=True)
+                    image_path = os.path.join(save_path,  f'{prompt_ori}', f'img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}.png')
+                    torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
+
+        self.accelerator.wait_for_everyone()
         results = dict()
         for evaluator in self.evaluators:
             self.logger.info('Evaluating {} ...'.format(evaluator.name))
             results.update(evaluator.compute())
             evaluator.reset()
-
         if self.ema_model is not None:
             self.ema_model.restore(self.proxy_model.parameters())
+            self.ema_model.to(self.accelerator.device)
 
+        # release evaluator memory
+        _ = [evaluator.to("cpu") for evaluator in self.evaluators]
+
+        del image
         del pipeline
         torch.cuda.empty_cache()
 
         self.logger.info(f'Evaluation results:\n{results}')
+
         return results
+
+    def save_diffusers(self, save_path):
+        if self.ema_model is not None:
+            self.ema_model.store(self.proxy_model.parameters())
+            self.ema_model.copy_to(self.proxy_model.parameters())
+            self.ema_model.to("cpu")
+
+        unet = self.accelerator.unwrap_model(self.unet) if isinstance(self.unet, torch.nn.parallel.DistributedDataParallel) else self.unet
+        text_encoder = self.accelerator.unwrap_model(self.text_encoder) if isinstance(self.text_encoder, torch.nn.parallel.DistributedDataParallel) else self.text_encoder
+        vae = self.accelerator.unwrap_model(self.vae) if isinstance(self.vae,  torch.nn.parallel.DistributedDataParallel) else self.vae
+
+        # create pipeline
+        pipeline_kwargs = {
+            'text_encoder': text_encoder,
+            'tokenizer': self.tokenizer,
+            'unet': unet,
+            'vae': vae,
+            'revision': self.cfg.train.revision,
+            'torch_dtype': self.weight_dtype,
+            'safety_checker': None,
+        }
+        pipeline = StableDiffusionPipeline.from_pretrained(
+            self.cfg.train.pretrained_model_name_or_path,
+            **pipeline_kwargs
+        )
+        pipeline.save_pretrained(save_path)

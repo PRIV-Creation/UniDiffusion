@@ -52,7 +52,7 @@ class UniDiffusionPipeline:
     current_iter = 0
     evaluators = []
     config = None
-    unbiased_uncond = False
+    rectify_uncond = False
 
     def __init__(self, cfg):
         pass
@@ -119,8 +119,8 @@ class UniDiffusionPipeline:
             self.noise_scheduler = instantiate(self.cfg.noise_scheduler)
 
         # build origin unet
-        self.unbiased_uncond = (self.cfg.inference.unbiased_uncond or self.cfg.evaluation.unbiased_uncond)
-        if self.unbiased_uncond:
+        self.rectify_uncond = (self.cfg.inference.rectify_uncond or self.cfg.evaluation.rectify_uncond)
+        if self.rectify_uncond:
             self.unet_init = UNet2DConditionModel.from_pretrained(
                 pretrained_model_name_or_path=self.cfg.train.pretrained_model_name_or_path,
                 subfolder="unet",
@@ -583,7 +583,7 @@ class UniDiffusionPipeline:
             'safety_checker': None,
         }
 
-        if self.cfg.inference.unbiased_uncond:
+        if self.cfg.inference.rectify_uncond:
             pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
                 self.cfg.train.pretrained_model_name_or_path,
                 **pipeline_kwargs
@@ -708,7 +708,7 @@ class UniDiffusionPipeline:
             'torch_dtype': self.weight_dtype,
             'safety_checker': None,
         }
-        if self.cfg.evaluation.unbiased_uncond:
+        if self.cfg.evaluation.rectify_uncond:
             pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
                 self.cfg.train.pretrained_model_name_or_path,
                 **pipeline_kwargs

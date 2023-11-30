@@ -40,7 +40,7 @@ inference = {
     'save_path': None,
     'skip_error': False,
     'inference_iter': 5000,
-    'unbiased_uncond': False,
+    'rectify_uncond': False,
     'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
     'total_num': 10,
     'scheduler': 'DPMSolverMultistepScheduler',
@@ -56,7 +56,7 @@ evaluation = {
     'evaluation_iter': 10000,
     'skip_error': True,
     'total_num': 1000,  # synthesis images num
-    'unbiased_uncond': False,
+    'rectify_uncond': False,
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'scheduler': 'DPMSolverMultistepScheduler',

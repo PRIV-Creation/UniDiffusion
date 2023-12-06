@@ -7,6 +7,13 @@ train.output_dir = 'experiments/pokemon/lora'
 dataset.path = "lambdalabs/pokemon-blip-captions"
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
+inference.inference_iter = 200
+
+evaluation.evaluation_iter = 200
+evaluation.total_num = 50
+evaluation.evaluator.inception_score.enabled = True
+evaluation.evaluator.clip_score.enabled = True
+
 unet.training_args = {
     # update all KV of cross attention by lora
     r'attn2\.(to_k|to_v)': {

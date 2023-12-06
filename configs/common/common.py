@@ -60,7 +60,7 @@ inference = {
 
 evaluation = {
     'evaluation_iter': 10000,
-    'skip_error': True,
+    'skip_error': False,
     'total_num': 1000,  # synthesis images num
     'rectify_uncond': False,
     # 'batch_size': 1,    # not used
@@ -71,8 +71,8 @@ evaluation = {
         'num_inference_steps': 25,
         'guidance_scale': 7.5,
     },
-    "save_image": True,
-    "save_path": True,
+    "save_image": False,
+    "save_path": None,
     'evaluator': {
         'fid': {'enabled': False, 'feature': 2048, 'real_image_num': 10000},
         'inception_score': {'enabled': False},
@@ -81,7 +81,7 @@ evaluation = {
             'clip_model': 'openai/clip-vit-large-patch14',
             'prompts': None,      # used for generation. use evaluation.prompts if None.
             'prompts_ori': None,  # used for calculate text-image similarity. use evaluation.evaluator.clip_score.prompts if None.
-            'total_num': 100,     # only used when prompts is not None.
+            'total_num': None,     # only used when prompts is not None.
         },
     },
 }

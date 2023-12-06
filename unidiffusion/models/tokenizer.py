@@ -2,7 +2,7 @@ from .base_model import BaseModel
 from transformers import CLIPTokenizer
 
 
-class CLIPTokenizer_DT(CLIPTokenizer, BaseModel):
+class CLIPTokenizer_UniDiffusion(CLIPTokenizer, BaseModel):
 
     @classmethod
     def from_pretrained(cls, *args, **kwargs):

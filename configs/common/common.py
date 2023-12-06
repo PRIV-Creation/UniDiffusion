@@ -1,6 +1,8 @@
 from accelerate import Accelerator
 from accelerate.utils import ProjectConfiguration
 from unidiffusion.config import LazyCall as L
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+
 
 train = {
     # common configs
@@ -36,6 +38,10 @@ checkpoint = {
     'load_scheduler': True,
 }
 
+inference_pipeline = L(StableDiffusionPipeline.from_pretrained)(
+    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
+)
+
 inference = {
     'save_path': None,
     'skip_error': False,
@@ -43,8 +49,8 @@ inference = {
     'rectify_uncond': False,
     'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
     'total_num': 10,
-    'scheduler': 'DPMSolverMultistepScheduler',
-    'pipeline_kwargs': {
+    'scheduler': L(DPMSolverMultistepScheduler.from_config)(),
+    'forward_kwargs': {
         # arguments for pipeline.forward().
         'num_inference_steps': 25,
         'guidance_scale': 7.5,
@@ -59,12 +65,11 @@ evaluation = {
     'rectify_uncond': False,
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
-    'scheduler': 'DPMSolverMultistepScheduler',
-    'pipeline_kwargs': {
+    'scheduler': L(DPMSolverMultistepScheduler.from_config)(),
+    'forward_kwargs': {
         # arguments for pipeline.forward().
         'num_inference_steps': 25,
         'guidance_scale': 7.5,
-        'guidance_scale_ori': 7.5,
     },
     "save_image": True,
     "save_path": True,

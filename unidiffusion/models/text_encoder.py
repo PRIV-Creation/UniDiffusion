@@ -3,7 +3,7 @@ from .base_model import BaseModel
 from transformers import CLIPTextModel
 
 
-class CLIPTextModel_DT(BaseModel, CLIPTextModel):
+class CLIPTextModel_UniDiffusion(BaseModel, CLIPTextModel):
     model_name = 'text_encoder'
     start_token_idx = None
     end_token_idx = None

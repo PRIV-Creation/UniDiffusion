@@ -1,19 +1,19 @@
 from diffusers import DDPMScheduler, UNet2DConditionModel
 from unidiffusion.config import LazyCall as L
 from unidiffusion.models import (
-    CLIPTextModel_DT,
-    CLIPTokenizer_DT,
-    UNet2DConditionModel_DT,
-    AutoencoderKL_DT,
+    CLIPTextModel_UniDiffusion,
+    CLIPTokenizer_UniDiffusion,
+    UNet2DConditionModel_UniDiffusion,
+    AutoencoderKL_UniDiffusion,
 )
 
 # set model
-vae = L(AutoencoderKL_DT.from_pretrained)(
+vae = L(AutoencoderKL_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="vae",
 )
 
-unet = L(UNet2DConditionModel_DT.from_pretrained)(
+unet = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="unet",
 )
@@ -23,12 +23,12 @@ unet_init = L(UNet2DConditionModel.from_pretrained)(
     subfolder="unet",
 )
 
-tokenizer = L(CLIPTokenizer_DT.from_pretrained)(
+tokenizer = L(CLIPTokenizer_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="tokenizer",
 )
 
-text_encoder = L(CLIPTextModel_DT.from_pretrained)(
+text_encoder = L(CLIPTextModel_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder="text_encoder",
 )

@@ -23,10 +23,7 @@ from unidiffusion.evaluation import EVALUATOR
 from unidiffusion.utils.checkpoint import save_model_hook, load_model_hook
 from unidiffusion.utils.logger import setup_logger
 from unidiffusion.utils.snr import snr_loss
-from unidiffusion.models.diffusers_pipeline import StableDiffusionUnbiasedPipeline
-from diffusers import (
-    StableDiffusionPipeline,
-)
+from diffusers import StableDiffusionPipeline
 
 
 class UniDiffusionPipeline:
@@ -362,14 +359,18 @@ class UniDiffusionPipeline:
             self.accelerator.init_trackers(self.cfg.train.project)
 
         # save inference and evaluation prompt file
-        if os.path.isfile(self.cfg.inference.prompts):
+        if self.cfg.inference.prompts is not None and os.path.exists(self.cfg.inference.prompts):
             shutil.copy(self.cfg.inference.prompts, os.path.join(output_dir, 'inference_prompts.txt'))
-        if os.path.isfile(self.cfg.evaluation.prompts):
+        if self.cfg.evaluation.prompts is not None and os.path.exists(self.cfg.evaluation.prompts):
             shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_prompts.txt'))
-        if os.path.isfile(self.cfg.evaluation.clip_score.prompts):
-            shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_clip_score_prompts.txt'))
-        if os.path.isfile(self.cfg.evaluation.clip_score.prompts_ori):
-            shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_clip_score_prompts_ori.txt'))
+        if self.cfg.evaluation.evaluator.clip_score.prompts is not None \
+                and os.path.exists(self.cfg.evaluation.evaluator.clip_score.prompts):
+            shutil.copy(self.cfg.evaluation.evaluator.clip_score.prompts,
+                        os.path.join(output_dir, 'evaluation_clip_score_prompts.txt'))
+        if self.cfg.evaluation.evaluator.clip_score.prompts_ori is not None \
+                and os.path.exists(self.cfg.evaluation.evaluator.clip_score.prompts_ori):
+            shutil.copy(self.cfg.evaluation.evaluator.clip_score.prompts_ori,
+                        os.path.join(output_dir, 'evaluation_clip_score_prompts_ori.txt'))
 
     def prepare_inference(self, prepare_evaluator=False):
         # prepare models
@@ -608,21 +609,16 @@ class UniDiffusionPipeline:
             'safety_checker': None,
         }
 
+        self.cfg.inference_pipeline.update(pipeline_kwargs)
+        pipeline = instantiate(self.cfg.inference_pipeline)
+
         # rectify unconditional guidance (see xxxx)
         if self.cfg.inference.rectify_uncond:
-            pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
-                self.cfg.train.pretrained_model_name_or_path,
-                **pipeline_kwargs
-            )
             pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
-        else:
-            pipeline = StableDiffusionPipeline.from_pretrained(
-                self.cfg.train.pretrained_model_name_or_path,
-                **pipeline_kwargs
-            )
 
         # set scheduler
-        pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
+        self.cfg.inference.scheduler.config = pipeline.scheduler.config
+        pipeline.scheduler = instantiate(self.cfg.inference.scheduler)
 
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
@@ -662,7 +658,7 @@ class UniDiffusionPipeline:
                         prompt,
                         generator=generator,
                         output_type='pt',
-                        **self.cfg.inference.pipeline_kwargs
+                        **self.cfg.inference.forward_kwargs
                     ).images[0]
                     progress_bar.update(1)
                 image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompt}.png')
@@ -735,18 +731,18 @@ class UniDiffusionPipeline:
             'torch_dtype': self.weight_dtype,
             'safety_checker': None,
         }
-        if self.cfg.evaluation.rectify_uncond:
-            pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
-                self.cfg.train.pretrained_model_name_or_path,
-                **pipeline_kwargs
-            )
+
+        self.cfg.inference_pipeline.update(pipeline_kwargs)
+        pipeline = instantiate(self.cfg.inference_pipeline)
+
+        # rectify unconditional guidance (see xxxx)
+        if self.cfg.inference.rectify_uncond:
             pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
-        else:
-            pipeline = StableDiffusionPipeline.from_pretrained(
-                self.cfg.train.pretrained_model_name_or_path,
-                **pipeline_kwargs
-            )
-        pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
+
+        # set scheduler
+        self.cfg.inference.scheduler.config = pipeline.scheduler.config
+        pipeline.scheduler = instantiate(self.cfg.inference.scheduler)
+
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
@@ -800,7 +796,7 @@ class UniDiffusionPipeline:
                     prompt,
                     generator=generator,
                     output_type='pt',
-                    **self.cfg.evaluation.pipeline_kwargs
+                    **self.cfg.evaluation.forward_kwargs
                 ).images[0]
                 progress_bar.update(1)
                 _ = [evaluator.update(
@@ -830,7 +826,7 @@ class UniDiffusionPipeline:
                         generator=generator,
                         output_type='pt',
                         guidance_scale_ori=guidance_scale_ori,
-                        **self.cfg.evaluation.pipeline_kwargs
+                        **self.cfg.evaluation.forward_kwargs
                     ).images[0]
 
                     _ = [evaluator.update_by_evaluator_name(

@@ -1,7 +1,7 @@
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import *
 
 
-class StableDiffusionUnbiasedPipeline(StableDiffusionPipeline):
+class StableDiffusionRectifyPipeline(StableDiffusionPipeline):
     unet_init = None
 
     @torch.no_grad()

@@ -1,6 +1,6 @@
 from configs.common.get_common_config import *
 from unidiffusion.config import LazyCall as L
-from unidiffusion.models import UNet2DConditionModel_DT
+from unidiffusion.models import UNet2DConditionModel_UniDiffusion
 
 
 dataset = get_config("common/data/image_dataset.py").dataset
@@ -36,7 +36,7 @@ train.output_dir = 'experiments/afhq/afhq_null-text_bs32_1e-5'
 train.max_iter = 1000000
 train.wandb.enabled = True
 
-unet = L(UNet2DConditionModel_DT.from_pretrained)(
+unet = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder='unet',
     null_text=True,

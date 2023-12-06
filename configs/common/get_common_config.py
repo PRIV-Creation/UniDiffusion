@@ -8,6 +8,7 @@ optimizer = get_config("common/optim.py").optimizer
 lr_scheduler = get_config("common/scheduler.py").lr_scheduler
 train = get_config("common/common.py").train
 inference = get_config("common/common.py").inference
+inference_pipeline = get_config("common/common.py").inference_pipeline
 evaluation = get_config("common/common.py").evaluation
 accelerator = get_config("common/common.py").accelerator
 vae = get_config("common/model.py").vae

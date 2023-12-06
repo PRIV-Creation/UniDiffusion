@@ -1,5 +1,5 @@
-import torch
 from diffusers.models.attention_processor import AttnProcessor2_0
+
 
 class NulltextProcessor(AttnProcessor2_0):
     def __call__(

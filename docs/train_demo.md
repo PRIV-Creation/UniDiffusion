@@ -39,7 +39,7 @@ text_encoder.training_args = {
 ### 2. LoRA and text-to-image Finetune
 We use [pokemon-blip-captions](https://huggingface.co/datasets/lambdalabs/pokemon-blip-captions) dataset as example.
 ```bash
-accelerate launch scripts/train.py --config-file configs/train/lora.py
+accelerate launch scripts/train.py --config-file configs/train/lora_pokemon.py
 accelerate launch scripts/train.py --config-file configs/train/text_to_image_finetune.py
 ```
 

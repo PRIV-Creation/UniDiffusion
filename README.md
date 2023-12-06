@@ -121,10 +121,10 @@ accelerate launch scrits/common.py --config-file configs/train/text_to_image_fin
 <details open>
 <summary> Supported Personalization Methods</summary>
 
-- [x] [text-to-image finetune](configs/train/text_to_image_finetune.py)
-- [x] [dreambooth](configs/train/dreambooth.py)
+- [x] [text-to-image finetune](configs/examples/text_to_image_finetune.py)
+- [x] [dreambooth](configs/examples/dreambooth.py)
 - [x] [lora](configs/train/text_to_image_lora.py)
-- [x] [textual inversion](configs/train/textual_inversion.py)
+- [x] [textual inversion](configs/examples/textual_inversion.py)
 - [ ] XTI
 - [ ] Custom Diffusion
 

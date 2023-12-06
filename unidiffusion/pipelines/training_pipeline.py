@@ -5,7 +5,7 @@ class UniDiffusionTrainingPipeline(UniDiffusionPipeline):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.cfg = cfg
-        self.training = True
+        self.mode = "training"
         self.default_setup()
         self.build_model()
         self.prepare_db()

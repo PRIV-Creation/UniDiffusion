@@ -30,7 +30,7 @@ from diffusers import (
 
 class UniDiffusionPipeline:
     cfg = None
-    training = None
+    mode = None
     tokenizer = None
     noise_scheduler = None
     dataset = None
@@ -65,7 +65,7 @@ class UniDiffusionPipeline:
         self.config = OmegaConf.to_container(self.cfg, resolve=True)
         self.accelerator = instantiate(self.cfg.accelerator)
 
-        if self.accelerator.is_main_process and self.training:
+        if self.accelerator.is_main_process and self.mode == "training":
             os.makedirs(self.cfg.train.output_dir, exist_ok=True)
             # save all configs
             LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
@@ -652,10 +652,10 @@ class UniDiffusionPipeline:
                     progress_bar.update(1)
                 image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompt}.png')
                 torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
-                if self.training:
+                if self.mode == "training":
                     images.append(image)
 
-        if self.training:
+        if self.mode == "training":
             images = torch.stack(images)
             images = self.accelerator.gather(images)
             if self.accelerator.is_main_process:

@@ -5,7 +5,7 @@ class UniDiffusionInferencePipeline(UniDiffusionPipeline):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.cfg = cfg
-        self.training = False
+        self.mode = "inference"
         self.default_setup()
         self.build_model()
         self.build_dataloader()

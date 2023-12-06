@@ -785,11 +785,9 @@ class UniDiffusionPipeline:
                 clip_score_prompts_ori = [p for p in clip_score_prompts_ori if p != ""]
                 clip_score_prompts_ori = (clip_score_prompts_ori * (self.cfg.evaluation.evaluator.clip_score.total_num // (len(clip_score_prompts_ori) * self.accelerator.num_processes) + 1))[:self.cfg.evaluation.evaluator.clip_score.total_num // self.accelerator.num_processes]
 
-        # GCFG
-        guidance_scale_ori = self.cfg.evaluation.pipeline_kwargs.pop("guidance_scale_ori", None)
         # Only show the progress bar once on each machine.
         progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
-        progress_bar.set_description("Steps")
+        progress_bar.set_description("Evaluation Steps")
         for index, prompt in enumerate(prompts):
             with torch.autocast("cuda"):
                 image = pipeline(
@@ -818,21 +816,20 @@ class UniDiffusionPipeline:
                 desc="Evaluating CLIP Score",
                 disable=not self.accelerator.is_local_main_process
             )
-            progress_bar.set_description("Steps")
+            progress_bar.set_description("Evaluation of CLIP Score")
             for index, (prompt, prompt_ori) in enumerate(zip(clip_score_prompts, clip_score_prompts_ori)):
                 with torch.autocast("cuda"):
                     image = pipeline(
-                        [prompt, prompt_ori],
+                        prompt,
                         generator=generator,
                         output_type='pt',
-                        guidance_scale_ori=guidance_scale_ori,
                         **self.cfg.evaluation.forward_kwargs
                     ).images[0]
 
                     _ = [evaluator.update_by_evaluator_name(
                         name="CLIP_Score",
                         image=image[None],
-                        text=prompt,                    # used for CLIP Score
+                        text=prompt_ori,                # used for CLIP Score
                         calculate_clip_score=True,      # used for CLIP Score
                     ) for evaluator in self.evaluators]
                     progress_bar.update(1)

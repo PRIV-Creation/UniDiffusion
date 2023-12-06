@@ -17,6 +17,7 @@ class ImageDataset(BaseDataset):
         resolution=512,
         is_training=True,
         drop_prob=0.,
+        flip_prob=0.,
         prompt_template="a photo of {}",
     ):
         super().__init__()
@@ -40,6 +41,7 @@ class ImageDataset(BaseDataset):
             [
                 transforms.ToTensor(),
                 transforms.Resize(resolution, antialias=None),
+                transforms.RandomHorizontalFlip(p=flip_prob),
                 transforms.Normalize([0.5], [0.5]),
             ]
         )

@@ -421,143 +421,148 @@ class UniDiffusionPipeline:
         accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler
         optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
         while self.current_iter < self.cfg.train.max_iter:
-            batch = next(iter(self.dataloader))
-            with accelerator.accumulate(self.proxy_model):
-                # ------------------------------------------------------------
-                # 1. Inference
-                # ------------------------------------------------------------
-                if self.cfg.inference.inference_iter > 0 and self.current_iter % self.cfg.inference.inference_iter == 0:
-                    if self.cfg.inference.skip_error:
-                        try:
+            time_data_start = time.time()
+            for batch in self.dataloader:
+                time_data_end = time.time()
+                if self.current_iter < self.cfg.train.max_iter:
+                    break
+                with accelerator.accumulate(self.proxy_model):
+                    # ------------------------------------------------------------
+                    # 1. Inference
+                    # ------------------------------------------------------------
+                    if self.cfg.inference.inference_iter > 0 and self.current_iter % self.cfg.inference.inference_iter == 0:
+                        if self.cfg.inference.skip_error:
+                            try:
+                                self.inference()
+                            except:
+                                pass
+                        else:
                             self.inference()
-                        except:
-                            pass
-                    else:
-                        self.inference()
-                # ------------------------------------------------------------
-                # 2. Evaluation
-                # ------------------------------------------------------------
-                if self.cfg.evaluation.evaluation_iter > 0 and len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
-                    if self.cfg.evaluation.skip_error:
-                        try:
+                    # ------------------------------------------------------------
+                    # 2. Evaluation
+                    # ------------------------------------------------------------
+                    if self.cfg.evaluation.evaluation_iter > 0 and len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                        if self.cfg.evaluation.skip_error:
+                            try:
+                                evaluation_results = self.evaluate()
+                                evaluation_results["step"] = self.current_iter
+                                accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
+                            except:
+                                pass
+                        else:
                             evaluation_results = self.evaluate()
                             evaluation_results["step"] = self.current_iter
                             accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
-                        except:
-                            pass
+                    # ------------------------------------------------------------
+                    # 3. Diffusion and Denoising
+                    # ------------------------------------------------------------
+                    # Convert images to latent space
+                    time_vae_start = time.time()
+                    latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
+                    latents = latents * vae.config.scaling_factor
+                    time_vae_end = time.time()
+
+                    # Sample noise that we'll add to the latents
+                    noise = torch.randn_like(latents)
+                    bsz = latents.shape[0]
+                    # Sample a random timestep for each image
+                    timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
+                    timesteps = timesteps.long()
+                    # Add noise to the latents according to the noise magnitude at each timestep
+                    # (this is the forward diffusion process)
+                    noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+
+                    # Get the text embedding for conditioning
+                    time_text_start = time.time()
+                    encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=self.weight_dtype)
+                    time_text_end = time.time()
+
+                    # Predict the noise residual
+                    time_unet_start = time.time()
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                    time_unet_end = time.time()
+
+                    # Get the target for loss depending on the prediction type
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        target = noise
+                    elif noise_scheduler.config.prediction_type == "v_prediction":
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
                     else:
-                        evaluation_results = self.evaluate()
-                        evaluation_results["step"] = self.current_iter
-                        accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
-                # ------------------------------------------------------------
-                # 3. Diffusion and Denoising
-                # ------------------------------------------------------------
-                # Convert images to latent space
-                time_vae_start = time.time()
-                latents = vae.encode(batch["pixel_values"].to(dtype=self.weight_dtype)).latent_dist.sample().detach()
-                latents = latents * vae.config.scaling_factor
-                time_vae_end = time.time()
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
-                # Sample noise that we'll add to the latents
-                noise = torch.randn_like(latents)
-                bsz = latents.shape[0]
-                # Sample a random timestep for each image
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)
-                timesteps = timesteps.long()
-                # Add noise to the latents according to the noise magnitude at each timestep
-                # (this is the forward diffusion process)
-                noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
+                    # ------------------------------------------------------------
+                    # 5. Calculate loss and backward
+                    # ------------------------------------------------------------
+                    if 'db' in self.cfg.train and self.cfg.train.db.with_prior_preservation:
+                        # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
+                        model_pred, model_pred_prior = torch.chunk(model_pred, 2, dim=0)
+                        target, target_prior = torch.chunk(target, 2, dim=0)
 
-                # Get the text embedding for conditioning
-                time_text_start = time.time()
-                encoder_hidden_states = text_encoder(batch["input_ids"])[0].to(dtype=self.weight_dtype)
-                time_text_end = time.time()
-
-                # Predict the noise residual
-                time_unet_start = time.time()
-                model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
-                time_unet_end = time.time()
-
-                # Get the target for loss depending on the prediction type
-                if noise_scheduler.config.prediction_type == "epsilon":
-                    target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction":
-                    target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                else:
-                    raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
-
-                # ------------------------------------------------------------
-                # 5. Calculate loss and backward
-                # ------------------------------------------------------------
-                if 'db' in self.cfg.train and self.cfg.train.db.with_prior_preservation:
-                    # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
-                    model_pred, model_pred_prior = torch.chunk(model_pred, 2, dim=0)
-                    target, target_prior = torch.chunk(target, 2, dim=0)
-
-                    # Compute instance loss
-                    loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-
-                    # Compute prior loss
-                    prior_loss = F.mse_loss(model_pred_prior.float(), target_prior.float(), reduction="mean")
-
-                    # Add the prior loss to the instance loss.
-                    loss = loss + self.cfg.train.db.prior_loss_weight * prior_loss
-                else:
-                    if self.cfg.train.snr.enabled:
-                        loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
-                    else:
+                        # Compute instance loss
                         loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
-                time_update_start = time.time()
-                accelerator.backward(loss)
-                if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(self.proxy_model.parameters(), self.cfg.train.max_grad_norm)
+                        # Compute prior loss
+                        prior_loss = F.mse_loss(model_pred_prior.float(), target_prior.float(), reduction="mean")
 
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.zero_grad()
-                time_update_end = time.time()
+                        # Add the prior loss to the instance loss.
+                        loss = loss + self.cfg.train.db.prior_loss_weight * prior_loss
+                    else:
+                        if self.cfg.train.snr.enabled:
+                            loss = snr_loss(self.cfg.train.snr.snr_gamma, timesteps, noise_scheduler, model_pred, target)
+                        else:
+                            loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
-                # ------------------------------------------------------------
-                # 6. Keep not trainable text embedding unchanged
-                # ------------------------------------------------------------
-                if self.accelerator.unwrap_model(self.text_encoder).start_token_idx is not None:
-                    with torch.no_grad():
-                        index_no_updates = torch.ones((len(self.tokenizer),), dtype=torch.bool)
-                        index_no_updates[start_token_idx:] = False
-                        accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
-                            index_no_updates
-                        ] = orig_embeds_params[index_no_updates]
+                    time_update_start = time.time()
+                    accelerator.backward(loss)
+                    if accelerator.sync_gradients:
+                        accelerator.clip_grad_norm_(self.proxy_model.parameters(), self.cfg.train.max_grad_norm)
 
-                if accelerator.sync_gradients:
-                    # --------------------------------------------------------
-                    # 7. Update ema
-                    # --------------------------------------------------------
-                    if self.ema_model is not None:
-                        self.ema_model.step(self.proxy_model.parameters())
-                    # --------------------------------------------------------
-                    # 8. Save checkpoint
-                    # --------------------------------------------------------
-                    if accelerator.is_main_process:
-                        # Save checkpoint
-                        if self.current_iter % self.cfg.train.checkpointing_iter == 0 or \
-                                self.current_iter == (self.cfg.train.max_iter - 1):
-                            save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
-                            # Save Unet/VAE/Text Encoder
-                            accelerator.save_state(save_path)
-                            # Save EMA model
-                            if self.ema_model is not None:
-                                torch.save(self.ema_model.state_dict(), os.path.join(save_path, 'ema.pt'))
-                            self.logger.info(f"Saved state to {save_path}")
+                    optimizer.step()
+                    lr_scheduler.step()
+                    optimizer.zero_grad()
+                    time_update_end = time.time()
 
-                    progress_bar.update(1)
-                    self.current_iter += 1
+                    # ------------------------------------------------------------
+                    # 6. Keep not trainable text embedding unchanged
+                    # ------------------------------------------------------------
+                    if self.accelerator.unwrap_model(self.text_encoder).start_token_idx is not None:
+                        with torch.no_grad():
+                            index_no_updates = torch.ones((len(self.tokenizer),), dtype=torch.bool)
+                            index_no_updates[start_token_idx:] = False
+                            accelerator.unwrap_model(text_encoder).get_input_embeddings().weight[
+                                index_no_updates
+                            ] = orig_embeds_params[index_no_updates]
 
-                logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0],
-                        "vae": time_vae_end - time_vae_start, "text": time_text_end - time_text_start,
-                        "unet": time_unet_end - time_unet_start, "update": time_update_end - time_update_start}
-                progress_bar.set_postfix(**logs)
-                accelerator.log(logs, step=self.current_iter)
+                    if accelerator.sync_gradients:
+                        # --------------------------------------------------------
+                        # 7. Update ema
+                        # --------------------------------------------------------
+                        if self.ema_model is not None:
+                            self.ema_model.step(self.proxy_model.parameters())
+                        # --------------------------------------------------------
+                        # 8. Save checkpoint
+                        # --------------------------------------------------------
+                        if accelerator.is_main_process:
+                            # Save checkpoint
+                            if self.current_iter % self.cfg.train.checkpointing_iter == 0 or \
+                                    self.current_iter == (self.cfg.train.max_iter - 1):
+                                save_path = os.path.join(self.cfg.train.output_dir, f"checkpoint-{self.current_iter:06d}")
+                                # Save Unet/VAE/Text Encoder
+                                accelerator.save_state(save_path)
+                                # Save EMA model
+                                if self.ema_model is not None:
+                                    torch.save(self.ema_model.state_dict(), os.path.join(save_path, 'ema.pt'))
+                                self.logger.info(f"Saved state to {save_path}")
+
+                        progress_bar.update(1)
+                        self.current_iter += 1
+
+                    logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0],
+                            "time/data": time_data_end - time_data_start,
+                            "time/vae": time_vae_end - time_vae_start, "time/text": time_text_end - time_text_start,
+                            "time/unet": time_unet_end - time_unet_start, "time/update": time_update_end - time_update_start}
+                    progress_bar.set_postfix(**logs)
+                    accelerator.log(logs, step=self.current_iter)
         accelerator.end_training()
 
     def inference(self):

@@ -69,4 +69,4 @@ class HuggingFaceDataset(BaseDataset):
         return example
 
     def get_prompt(self, item):
-        return self.dataset[item]["prompt"]
+        return self[item]["prompt"]

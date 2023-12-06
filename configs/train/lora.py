@@ -8,8 +8,8 @@ dataset.path = "lambdalabs/pokemon-blip-captions"
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
 unet.training_args = {
-    # update all cross attention by lora
-    r'attn2': {
+    # update all KV of cross attention by lora
+    r'attn2\.(to_k|to_v)': {
         'mode': 'lora',
         'module_kwargs': {'scale': 1.0, 'rank': 4},
         'optim_kwargs': {'lr': '${optimizer.lr}'},

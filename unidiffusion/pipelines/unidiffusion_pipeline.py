@@ -574,6 +574,8 @@ class UniDiffusionPipeline:
 
     def inference(self):
         self.logger.info('Start inference ... ')
+
+        # prepare inference models and pipeline
         if self.ema_model is not None:
             self.ema_model.store(self.proxy_model.parameters())
             self.ema_model.copy_to(self.proxy_model.parameters())
@@ -595,6 +597,7 @@ class UniDiffusionPipeline:
             'safety_checker': None,
         }
 
+        # rectify unconditional guidance (see xxxx)
         if self.cfg.inference.rectify_uncond:
             pipeline = StableDiffusionUnbiasedPipeline.from_pretrained(
                 self.cfg.train.pretrained_model_name_or_path,
@@ -607,11 +610,12 @@ class UniDiffusionPipeline:
                 **pipeline_kwargs
             )
 
+        # set scheduler
         pipeline.scheduler = diffusers.__dict__[self.cfg.inference.scheduler].from_config(pipeline.scheduler.config)
+
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
-        # run inference
         if (seed := self.cfg.train.seed) is None:
             generator = None
         else:

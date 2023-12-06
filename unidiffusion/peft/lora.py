@@ -66,7 +66,7 @@ class LoRALinearLayer(BaseLoRAModule):
         # control what params to be grad-enabled
         self.apply_to()
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, scale=None):
         down_hidden_states = self.down(hidden_states)
         up_hidden_states = self.up(down_hidden_states)
 
@@ -118,7 +118,7 @@ class LoRAConvLayer(BaseLoRAModule):
         wb = self.lora_down.weight
         return (wa.view(wa.size(0), -1) @ wb.view(wb.size(0), -1)).view(self.shape)
 
-    def forward(self, x):
+    def forward(self, x, scale=None):
         if self.cp:
             return self.org_forward(x) + self.dropout(
                 self.lora_up(self.lora_mid(self.lora_down(x))) * self.scale

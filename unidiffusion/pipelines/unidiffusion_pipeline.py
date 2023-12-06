@@ -420,6 +420,7 @@ class UniDiffusionPipeline:
 
         accelerator, unet, vae, text_encoder, noise_scheduler = self.accelerator, self.unet, self.vae, self.text_encoder, self.noise_scheduler
         optimizer, lr_scheduler = self.optimizer, self.lr_scheduler
+        accumulation_first_iter = True
         while self.current_iter < self.cfg.train.max_iter:
             time_data_start = time.time()
             for batch in self.dataloader:
@@ -430,7 +431,8 @@ class UniDiffusionPipeline:
                     # ------------------------------------------------------------
                     # 1. Inference
                     # ------------------------------------------------------------
-                    if self.cfg.inference.inference_iter > 0 and self.current_iter % self.cfg.inference.inference_iter == 0:
+                    if self.cfg.inference.inference_iter > 0 \
+                            and self.current_iter % self.cfg.inference.inference_iter == 0 and accumulation_first_iter:
                         if self.cfg.inference.skip_error:
                             try:
                                 self.inference()
@@ -441,7 +443,10 @@ class UniDiffusionPipeline:
                     # ------------------------------------------------------------
                     # 2. Evaluation
                     # ------------------------------------------------------------
-                    if self.cfg.evaluation.evaluation_iter > 0 and len(self.evaluators) >= 1 and self.current_iter % self.cfg.evaluation.evaluation_iter == 0:
+                    if self.cfg.evaluation.evaluation_iter > 0 \
+                            and len(self.evaluators) >= 1 \
+                            and self.current_iter % self.cfg.evaluation.evaluation_iter == 0 \
+                            and accumulation_first_iter:
                         if self.cfg.evaluation.skip_error:
                             try:
                                 evaluation_results = self.evaluate()
@@ -453,6 +458,7 @@ class UniDiffusionPipeline:
                             evaluation_results = self.evaluate()
                             evaluation_results["step"] = self.current_iter
                             accelerator.log({'inference/' + k: v for k, v in evaluation_results.items()})
+                    accumulation_first_iter = False
                     # ------------------------------------------------------------
                     # 3. Diffusion and Denoising
                     # ------------------------------------------------------------
@@ -556,6 +562,7 @@ class UniDiffusionPipeline:
 
                         progress_bar.update(1)
                         self.current_iter += 1
+                        accumulation_first_iter = True
 
                     logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0],
                             "time/data": time_data_end - time_data_start,

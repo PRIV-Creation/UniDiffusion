@@ -424,7 +424,7 @@ class UniDiffusionPipeline:
             time_data_start = time.time()
             for batch in self.dataloader:
                 time_data_end = time.time()
-                if self.current_iter < self.cfg.train.max_iter:
+                if self.current_iter >= self.cfg.train.max_iter:
                     break
                 with accelerator.accumulate(self.proxy_model):
                     # ------------------------------------------------------------

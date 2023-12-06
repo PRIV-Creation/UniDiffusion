@@ -582,6 +582,8 @@ class UniDiffusionPipeline:
                             "time/unet": time_unet_end - time_unet_start, "time/update": time_update_end - time_update_start}
                     progress_bar.set_postfix(**logs)
                     accelerator.log(logs, step=self.current_iter)
+
+                time_data_start = time.time()
         accelerator.end_training()
 
     def inference(self):

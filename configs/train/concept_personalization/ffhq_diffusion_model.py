@@ -19,9 +19,9 @@ train.checkpointing_iter = 10000
 dataset.placeholder = 'face'    # not used in null-text mode
 dataset.flip_prob = 0.5
 
-# 8 gpus. Total batch size = 1 * 4 * 8 = 32
-dataloader.batch_size = 1
-train.gradient_accumulation_iter = 4
+# 2 gpus. Total batch size = 2 * 16 * 1 = 32
+dataloader.batch_size = 16
+train.gradient_accumulation_iter = 1
 
 # Inference
 inference.inference_iter = 10000

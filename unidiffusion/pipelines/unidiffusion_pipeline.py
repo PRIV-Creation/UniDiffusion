@@ -740,8 +740,8 @@ class UniDiffusionPipeline:
             pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
 
         # set scheduler
-        self.cfg.inference.scheduler.config = pipeline.scheduler.config
-        pipeline.scheduler = instantiate(self.cfg.inference.scheduler)
+        self.cfg.evaluation.scheduler.config = pipeline.scheduler.config
+        pipeline.scheduler = instantiate(self.cfg.evaluation.scheduler)
 
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
@@ -761,7 +761,7 @@ class UniDiffusionPipeline:
                 prompts = [self.cfg.evaluation.prompts] * (self.cfg.evaluation.total_num // self.accelerator.num_processes)
         else:
             # to keep the same prompts with real images and different between processes
-            random.seed(0)
+            random.seed(self.cfg.train.seed)
             total_idx = random.sample(list(range(len(self.dataset))) * (int(self.cfg.evaluation.total_num / len(self.dataset)) + 1), self.cfg.evaluation.total_num)
             image_per_process = len(total_idx) // self.accelerator.num_processes
             process_idx = total_idx[self.accelerator.process_index * image_per_process: (self.accelerator.process_index + 1) * image_per_process]

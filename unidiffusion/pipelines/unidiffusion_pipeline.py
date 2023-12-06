@@ -7,6 +7,7 @@ from tqdm import tqdm
 import random
 import time
 import torchvision
+import shutil
 from accelerate import PartialState
 import torch
 import torch.nn.functional as F
@@ -359,6 +360,16 @@ class UniDiffusionPipeline:
                 wandb.define_metric("inference/*", step_metric="inference/step")
         else:
             self.accelerator.init_trackers(self.cfg.train.project)
+
+        # save inference and evaluation prompt file
+        if os.path.isfile(self.cfg.inference.prompts):
+            shutil.copy(self.cfg.inference.prompts, os.path.join(output_dir, 'inference_prompts.txt'))
+        if os.path.isfile(self.cfg.evaluation.prompts):
+            shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_prompts.txt'))
+        if os.path.isfile(self.cfg.evaluation.clip_score.prompts):
+            shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_clip_score_prompts.txt'))
+        if os.path.isfile(self.cfg.evaluation.clip_score.prompts_ori):
+            shutil.copy(self.cfg.evaluation.prompts, os.path.join(output_dir, 'evaluation_clip_score_prompts_ori.txt'))
 
     def prepare_inference(self, prepare_evaluator=False):
         # prepare models

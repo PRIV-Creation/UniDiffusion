@@ -74,8 +74,8 @@ evaluation = {
         'clip_score': {
             'enabled': False,
             'clip_model': 'openai/clip-vit-large-patch14',
-            'prompts': None,      # use evaluation prompts if None.
-            'prompts_ori': None,      # use evaluation prompts if None.
+            'prompts': None,      # used for generation. use evaluation.prompts if None.
+            'prompts_ori': None,  # used for calculate text-image similarity. use evaluation.evaluator.clip_score.prompts if None.
             'total_num': 100,     # only used when prompts is not None.
         },
     },

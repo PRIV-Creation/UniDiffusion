@@ -30,7 +30,10 @@ def _convert_target_to_string(t: Any) -> str:
     Args:
         t: any object with ``__module__`` and ``__qualname__``
     """
-    module, qualname = t.__module__, t.__qualname__
+    if hasattr(t, "__self__"):
+        module, qualname = t.__self__.__module__, t.__self__.__qualname__ + '.' + t.__name__
+    else:
+        module, qualname = t.__module__, t.__qualname__
 
     # Compress the path to this object, e.g. ``module.submodule._impl.class``
     # may become ``module.submodule.class``, if the later also resolves to the same

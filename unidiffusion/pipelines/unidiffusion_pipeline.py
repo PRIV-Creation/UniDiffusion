@@ -77,6 +77,7 @@ class UniDiffusionPipeline:
                     'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
                     os.path.split(output_dir)[-2],
                     'id': self.cfg.train.wandb.id,
+                    'resume': True if self.cfg.train.wandb.id is not None else None,
                 }
                 init_kwargs['wandb'] = wandb_kwargs
             self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)

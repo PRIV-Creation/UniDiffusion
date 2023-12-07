@@ -26,7 +26,7 @@ train.gradient_accumulation_iter = 1
 # Inference
 inference.inference_iter = 10000
 inference.rectify_uncond = True
-inference.pipeline_kwargs.guidance_scale = 2.0
+inference.forward_kwargs.guidance_scale = 2.0
 inference.total_num = 80
 
 # Evaluation

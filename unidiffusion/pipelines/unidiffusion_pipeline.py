@@ -66,6 +66,28 @@ class UniDiffusionPipeline:
         if self.accelerator.is_main_process and self.mode == "training":
             os.makedirs(self.cfg.train.output_dir, exist_ok=True)
             # save all configs
+            # LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
+
+        output_dir = self.cfg.train.output_dir
+        if self.accelerator.is_main_process:
+            init_kwargs = dict()
+            if self.cfg.train.wandb.enabled:
+                wandb_kwargs = {
+                    'entity': self.cfg.train.wandb.entity,
+                    'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
+                    os.path.split(output_dir)[-2],
+                    'id': self.cfg.train.wandb.id,
+                }
+                init_kwargs['wandb'] = wandb_kwargs
+            self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
+            if self.cfg.train.wandb.enabled:
+                self.cfg.train.wandb.id = self.accelerator.get_tracker("wandb").tracker.id
+                wandb.define_metric("inference/step")
+                wandb.define_metric("inference/*", step_metric="inference/step")
+        else:
+            self.accelerator.init_trackers(self.cfg.train.project)
+
+        if self.accelerator.is_main_process and self.mode == "training":
             LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
 
         # prepare checkpoint hook
@@ -341,22 +363,6 @@ class UniDiffusionPipeline:
 
         # prepare tracker
         output_dir = self.cfg.train.output_dir
-
-        if self.accelerator.is_main_process:
-            init_kwargs = dict()
-            if self.cfg.train.wandb.enabled:
-                wandb_kwargs = {
-                    'entity': self.cfg.train.wandb.entity,
-                    'name': os.path.split(output_dir)[-1] if os.path.split(output_dir)[-1] != '' else
-                    os.path.split(output_dir)[-2],
-                }
-                init_kwargs['wandb'] = wandb_kwargs
-            self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
-            if self.cfg.train.wandb.enabled:
-                wandb.define_metric("inference/step")
-                wandb.define_metric("inference/*", step_metric="inference/step")
-        else:
-            self.accelerator.init_trackers(self.cfg.train.project)
 
         # save inference and evaluation prompt file
         if self.cfg.inference.prompts is not None and os.path.exists(self.cfg.inference.prompts):

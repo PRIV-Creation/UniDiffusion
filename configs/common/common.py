@@ -13,18 +13,18 @@ train = {
     'seed': 0,
     'use_xformers': True,
     'gradient_checkpointing': False,
-    'resume': None,  # "latest" | checkpoint path
+    'resume': None,  # "latest" or checkpoint path
     'use_ema': True,
     'resolution': 512,
     # pipelines configs
-    'max_iter': 10000,
+    'max_iter': 100000,
     'max_grad_norm': 1.0,
     'lr_warmup_iter': 0,
     'gradient_accumulation_iter': 1,
     # logging configs
-    'checkpointing_iter': 5000,
+    'checkpointing_iter': 1000,
     # Experiment Trackers
-    'wandb': {'enabled': False, 'entity': None,},
+    'wandb': {'enabled': False, 'entity': None, 'id': None},
     'tensorboard': {'enabled': False},
     'comet_ml': {'enabled': False},
     # training mechanisms

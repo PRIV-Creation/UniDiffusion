@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint
 import transformers
 from accelerate.utils import set_seed
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, ListConfig
 from diffusers import UNet2DConditionModel
 from diffusers.training_utils import EMAModel
 from unidiffusion.peft.proxy import ProxyNetwork
@@ -632,11 +632,6 @@ class UniDiffusionPipeline:
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
-        if (seed := self.cfg.train.seed) is None:
-            generator = None
-        else:
-            generator = torch.Generator(device=self.accelerator.device).manual_seed(seed + self.accelerator.process_index)
-
         # inference prompts
         if self.cfg.inference.prompts is not None:
             if os.path.isfile(self.cfg.inference.prompts):
@@ -655,49 +650,60 @@ class UniDiffusionPipeline:
             save_path = os.path.join(self.cfg.train.output_dir, f'visualization-{self.current_iter:06d}')
         os.makedirs(save_path, exist_ok=True)
 
-        distributed_state = PartialState()
-        with distributed_state.split_between_processes(prompts) as prompt_per_card:
-            # Only show the progress bar once on each machine.
-            progress_bar = tqdm(range(len(prompt_per_card)), disable=not self.accelerator.is_local_main_process)
-            progress_bar.set_description("Steps")
-            images = []
-            for index, prompt in enumerate(prompt_per_card):
-                with torch.autocast("cuda"):
-                    image = pipeline(
-                        prompt,
-                        generator=generator,
-                        output_type='pt',
-                        **self.cfg.inference.forward_kwargs
-                    ).images[0]
-                    progress_bar.update(1)
-                image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompt}.png')
-                torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
-                if self.mode == "training":
-                    images.append(image)
+        if not isinstance(self.cfg.inference.guidance_scale, (ListConfig, list)):
+            self.cfg.inference.guidance_scale = [self.cfg.inference.guidance_scale]
 
-        if self.mode == "training":
-            images = torch.stack(images)
-            images = self.accelerator.gather(images)
-            if self.accelerator.is_main_process:
-                for tracker in self.accelerator.trackers:
-                    if tracker.name == "tensorboard":
-                        np_images = np.asarray(images)
-                        tracker.writer.add_images("inference", np_images, self.current_iter, dataformats="NHWC")
-                    if tracker.name == "wandb":
-                        self.logger.info("Logging images to wandb")
-                        tracker.log(
-                            {
-                                "validation": [
-                                    wandb.Image(image, caption=f"{i}: {prompt}") for i, (image, prompt) in
-                                    enumerate(zip(images, prompts))
-                                ]
-                            }
-                        )
-                        self.logger.info("Logging images to wandb finish!")
+        for guidance_scale in self.cfg.inference.guidance_scale:
+            if (seed := self.cfg.train.seed) is None:
+                generator = None
+            else:
+                generator = torch.Generator(device=self.accelerator.device).manual_seed(
+                    seed + self.accelerator.process_index)
 
-            if self.ema_model is not None:
-                self.ema_model.restore(self.proxy_model.parameters())
-                self.ema_model.to(self.accelerator.device)
+            distributed_state = PartialState()
+            with distributed_state.split_between_processes(prompts) as prompt_per_card:
+                # Only show the progress bar once on each machine.
+                progress_bar = tqdm(range(len(prompt_per_card)), disable=not self.accelerator.is_local_main_process)
+                progress_bar.set_description("Steps")
+                images = []
+                for index, prompt in enumerate(prompt_per_card):
+                    with torch.autocast("cuda"):
+                        image = pipeline(
+                            prompt,
+                            generator=generator,
+                            output_type='pt',
+                            guidance_scale=guidance_scale,
+                            **self.cfg.inference.forward_kwargs
+                        ).images[0]
+                        progress_bar.update(1)
+                    image_path = os.path.join(save_path,  f'cfg_{guidance_scale:.2f}_img{index + self.accelerator.process_index * self.cfg.inference.total_num:04d}_{prompt}.png')
+                    torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
+                    if self.mode == "training":
+                        images.append(image)
+
+            if self.mode == "training":
+                images = torch.stack(images)
+                images = self.accelerator.gather(images)
+                if self.accelerator.is_main_process:
+                    for tracker in self.accelerator.trackers:
+                        if tracker.name == "tensorboard":
+                            np_images = np.asarray(images)
+                            tracker.writer.add_images("inference", np_images, self.current_iter, dataformats="NHWC")
+                        if tracker.name == "wandb":
+                            self.logger.info("Logging images to wandb")
+                            tracker.log(
+                                {
+                                    f"validation/cfg{guidance_scale:.2f}": [
+                                        wandb.Image(image, caption=f"{i}: {prompt}") for i, (image, prompt) in
+                                        enumerate(zip(images, prompts))
+                                    ]
+                                }
+                            )
+                            self.logger.info("Logging images to wandb finish!")
+
+        if self.ema_model is not None:
+            self.ema_model.restore(self.proxy_model.parameters())
+            self.ema_model.to(self.accelerator.device)
 
         self.accelerator.wait_for_everyone()
         del images
@@ -755,9 +761,6 @@ class UniDiffusionPipeline:
         pipeline = pipeline.to(self.accelerator.device)
         pipeline.set_progress_bar_config(disable=True)
 
-        # run inference
-        generator = torch.Generator(device=self.accelerator.device).manual_seed(self.cfg.train.seed + self.accelerator.process_index)
-
         # random select different data for each process
         if self.cfg.evaluation.prompts is not None:
             if os.path.isfile(self.cfg.evaluation.prompts):
@@ -794,65 +797,78 @@ class UniDiffusionPipeline:
                 clip_score_prompts_ori = [p for p in clip_score_prompts_ori if p != ""]
                 clip_score_prompts_ori = (clip_score_prompts_ori * (self.cfg.evaluation.evaluator.clip_score.total_num // (len(clip_score_prompts_ori) * self.accelerator.num_processes) + 1))[:self.cfg.evaluation.evaluator.clip_score.total_num // self.accelerator.num_processes]
 
-        # Only show the progress bar once on each machine.
-        progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
-        progress_bar.set_description("Evaluation Steps")
-        for index, prompt in enumerate(prompts):
-            with torch.autocast("cuda"):
-                image = pipeline(
-                    prompt,
-                    generator=generator,
-                    output_type='pt',
-                    **self.cfg.evaluation.forward_kwargs
-                ).images[0]
-                progress_bar.update(1)
-                _ = [evaluator.update(
-                    image=image[None],
-                    text=prompt,                                                  # used for CLIP Score
-                    calculate_clip_score=calculate_clip_score_by_general_prompt,  # used for CLIP Score
-                    real=False,                                                   # used for FID
-                ) for evaluator in self.evaluators]
-            if save_image:
-                image_path = os.path.join(save_path,  f'img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}_{prompt}.png')
-                torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
+        if not isinstance(self.cfg.evaluation.guidance_scale, (ListConfig, list)):
+            self.cfg.evaluation.guidance_scale = [self.cfg.evaluation.guidance_scale]
 
-        # Evaluate CLIP Score
-        if not calculate_clip_score_by_general_prompt:
+        results = dict()
+        for guidance_scale in self.cfg.inference.guidance_scale:
+            # run inference
             generator = torch.Generator(device=self.accelerator.device).manual_seed(
                 self.cfg.train.seed + self.accelerator.process_index)
-            progress_bar = tqdm(
-                range(len(clip_score_prompts)),
-                desc="Evaluating CLIP Score",
-                disable=not self.accelerator.is_local_main_process
-            )
-            progress_bar.set_description("Evaluation of CLIP Score")
-            for index, (prompt, prompt_ori) in enumerate(zip(clip_score_prompts, clip_score_prompts_ori)):
+
+            # Only show the progress bar once on each machine.
+            progress_bar = tqdm(range(len(prompts)), disable=not self.accelerator.is_local_main_process)
+            progress_bar.set_description("Evaluation Steps")
+            for index, prompt in enumerate(prompts):
                 with torch.autocast("cuda"):
                     image = pipeline(
                         prompt,
                         generator=generator,
                         output_type='pt',
+                        guidance_scale=guidance_scale,
                         **self.cfg.evaluation.forward_kwargs
                     ).images[0]
-
-                    _ = [evaluator.update_by_evaluator_name(
-                        name="CLIP_Score",
-                        image=image[None],
-                        text=prompt_ori,                # used for CLIP Score
-                        calculate_clip_score=True,      # used for CLIP Score
-                    ) for evaluator in self.evaluators]
                     progress_bar.update(1)
+                    _ = [evaluator.update(
+                        image=image[None],
+                        text=prompt,                                                  # used for CLIP Score
+                        calculate_clip_score=calculate_clip_score_by_general_prompt,  # used for CLIP Score
+                        real=False,                                                   # used for FID
+                    ) for evaluator in self.evaluators]
                 if save_image:
-                    os.makedirs(os.path.join(save_path, f'{prompt_ori}'), exist_ok=True)
-                    image_path = os.path.join(save_path,  f'{prompt_ori}', f'img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}.png')
+                    image_path = os.path.join(save_path,  f'cfg{guidance_scale:.2f}_img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}_{prompt}.png')
                     torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
 
-        self.accelerator.wait_for_everyone()
-        results = dict()
-        for evaluator in self.evaluators:
-            self.logger.info('Evaluating {} ...'.format(evaluator.name))
-            results.update(evaluator.compute())
-            evaluator.reset()
+            # Evaluate CLIP Score
+            if not calculate_clip_score_by_general_prompt:
+                generator = torch.Generator(device=self.accelerator.device).manual_seed(
+                    self.cfg.train.seed + self.accelerator.process_index)
+                progress_bar = tqdm(
+                    range(len(clip_score_prompts)),
+                    desc="Evaluating CLIP Score",
+                    disable=not self.accelerator.is_local_main_process
+                )
+                progress_bar.set_description("Evaluation of CLIP Score")
+                for index, (prompt, prompt_ori) in enumerate(zip(clip_score_prompts, clip_score_prompts_ori)):
+                    with torch.autocast("cuda"):
+                        image = pipeline(
+                            prompt,
+                            generator=generator,
+                            output_type='pt',
+                            guidance_scale=guidance_scale,
+                            **self.cfg.evaluation.forward_kwargs
+                        ).images[0]
+
+                        _ = [evaluator.update_by_evaluator_name(
+                            name="CLIP_Score",
+                            image=image[None],
+                            text=prompt_ori,                # used for CLIP Score
+                            calculate_clip_score=True,      # used for CLIP Score
+                        ) for evaluator in self.evaluators]
+                        progress_bar.update(1)
+                    if save_image:
+                        os.makedirs(os.path.join(save_path, f'{prompt_ori}'), exist_ok=True)
+                        image_path = os.path.join(save_path,  f'{prompt_ori}', f'cfg{guidance_scale:.2f}_img{index + self.accelerator.process_index * self.cfg.evaluation.total_num:04d}.png')
+                        torchvision.transforms.ToPILImage(mode=None)(image).save(image_path)
+
+            self.accelerator.wait_for_everyone()
+            tmp_result = dict()
+            for evaluator in self.evaluators:
+                self.logger.info('Evaluating {} ...'.format(evaluator.name))
+                tmp_result.update(evaluator.compute())
+                evaluator.reset()
+                results[f'cfg{guidance_scale:.2f}'] = tmp_result
+
         if self.ema_model is not None:
             self.ema_model.restore(self.proxy_model.parameters())
             self.ema_model.to(self.accelerator.device)

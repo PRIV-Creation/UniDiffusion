@@ -26,11 +26,16 @@ train.gradient_accumulation_iter = 1
 # Inference
 inference.inference_iter = 10000
 inference.rectify_uncond = True
-inference.forward_kwargs.guidance_scale = 2.0
+inference.guidance_scale = [1.5 + 0.25 * i for i in range(5)]
 inference.total_num = 80
 
 # Evaluation
-evaluation.evaluation_iter = 0
+evaluation.evaluation_iter = 10000
+evaluation.rectify_uncond = True
+evaluation.evaluator.fid.enabled = True
+evaluation.evaluator.fid.real_image_num = 1000
+evaluation.total_num = 1000
+evaluation.guidance_scale = [1.5 + 0.25 * i for i in range(5)]
 
 train.output_dir = 'experiments/ffhq/ffhq_null-text_bs32_1e-5'
 train.max_iter = 1000000

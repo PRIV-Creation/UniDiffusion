@@ -50,10 +50,10 @@ inference = {
     'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
     'total_num': 10,
     'scheduler': L(DPMSolverMultistepScheduler.from_config)(),
+    'guidance_scale': 7.5,
     'forward_kwargs': {
         # arguments for pipeline.forward().
         'num_inference_steps': 25,
-        'guidance_scale': 7.5,
     },
 
 }
@@ -66,10 +66,10 @@ evaluation = {
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None
     'scheduler': L(DPMSolverMultistepScheduler.from_config)(),
+    'guidance_scale': [7.5],
     'forward_kwargs': {
         # arguments for pipeline.forward().
         'num_inference_steps': 25,
-        'guidance_scale': 7.5,
     },
     "save_image": False,
     "save_path": None,

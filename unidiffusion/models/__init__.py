@@ -2,3 +2,4 @@ from .text_encoder import CLIPTextModel_UniDiffusion
 from .unet import UNet2DConditionModel_UniDiffusion
 from .vae import AutoencoderKL_UniDiffusion
 from .tokenizer import CLIPTokenizer_UniDiffusion
+from .unet_nulltext import UNet2DConditionModel_NullText

@@ -801,7 +801,7 @@ class UniDiffusionPipeline:
             self.cfg.evaluation.guidance_scale = [self.cfg.evaluation.guidance_scale]
 
         results = dict()
-        for guidance_scale in self.cfg.inference.guidance_scale:
+        for guidance_scale in self.cfg.evaluation.guidance_scale:
             # run inference
             generator = torch.Generator(device=self.accelerator.device).manual_seed(
                 self.cfg.train.seed + self.accelerator.process_index)

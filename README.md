@@ -144,7 +144,7 @@ We are going to add the following features in the future. We also welcome contri
 - **Methods**:
   - [ ] preservation of class semantic priors (dreambooth).
   - [ ] XTI & Custom Diffusion.
-  - [ ] RepAdapter and LyCoris.
+  - [ ] RepAdapter and LyCORIS.
 - **Features**:
   - [ ] Merge PEFT to original model.
   - [ ] Convert model to diffusers and webui format.

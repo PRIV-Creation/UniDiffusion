@@ -751,7 +751,7 @@ class UniDiffusionPipeline:
         pipeline = instantiate(self.cfg.inference_pipeline)
 
         # rectify unconditional guidance (see xxxx)
-        if self.cfg.inference.rectify_uncond:
+        if self.cfg.evaluation.rectify_uncond:
             pipeline.unet_init = self.unet_init.to(dtype=self.weight_dtype, device=self.accelerator.device)
 
         # set scheduler

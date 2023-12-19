@@ -80,7 +80,12 @@ class UniDiffusionPipeline:
                     'resume': True if self.cfg.train.wandb.id is not None else None,
                 }
                 init_kwargs['wandb'] = wandb_kwargs
-            self.accelerator.init_trackers(self.cfg.train.project, config=self.config, init_kwargs=init_kwargs)
+            else:
+                wandb_kwargs = None
+            self.accelerator.init_trackers(
+                self.cfg.train.project,
+                config=self.config if (wandb_kwargs is not None and not wandb_kwargs['resume']) else None,
+                init_kwargs=init_kwargs)
             if self.cfg.train.wandb.enabled:
                 self.cfg.train.wandb.id = self.accelerator.get_tracker("wandb").tracker.id
                 wandb.define_metric("inference/step")

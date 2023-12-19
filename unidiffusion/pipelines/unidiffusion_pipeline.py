@@ -69,7 +69,7 @@ class UniDiffusionPipeline:
             # LazyConfig.save(self.cfg, os.path.join(self.cfg.train.output_dir, 'config.yaml'))
 
         output_dir = self.cfg.train.output_dir
-        if self.accelerator.is_main_process:
+        if self.accelerator.is_main_process and self.mode == "training":
             init_kwargs = dict()
             if self.cfg.train.wandb.enabled:
                 wandb_kwargs = {

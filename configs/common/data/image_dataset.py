@@ -6,6 +6,6 @@ dataset = L(ImageDataset)(
     path=None,
     placeholder=None,
     inversion_placeholder=None,
-    resolution='${train.resolution}',
+    # resolution='${train.resolution}',
     prompt_template="a photo of {}"
 )

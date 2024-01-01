@@ -14,7 +14,7 @@ class ImageDataset(BaseDataset):
         tokenizer,
         placeholder,
         inversion_placeholder,
-        resolution=512,
+        resolution=(512, 512),
         is_training=True,
         drop_prob=0.,
         flip_prob=0.,

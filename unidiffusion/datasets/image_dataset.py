@@ -5,6 +5,7 @@ from .dataset import BaseDataset
 from torchvision import transforms
 from PIL import Image
 from omegaconf import ListConfig
+from unidiffusion.utils.data_transform import aspect_ratio_transform
 
 
 class ImageDataset(BaseDataset):
@@ -20,6 +21,7 @@ class ImageDataset(BaseDataset):
         flip_prob=0.,
         prompt_template="a photo of {}",
         skip_error=True,
+        transform_mode="resize_only",
     ):
         super().__init__()
         self.tokenizer = tokenizer
@@ -39,14 +41,17 @@ class ImageDataset(BaseDataset):
 
         self._length = self.num_instance_images
 
-        self.image_transforms = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Resize(resolution, antialias=None),
-                transforms.RandomHorizontalFlip(p=flip_prob),
-                transforms.Normalize([0.5], [0.5]),
-            ]
-        )
+        if transform_mode == "resize_only":
+            self.image_transforms = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Resize(resolution, antialias=None),
+                    transforms.RandomHorizontalFlip(p=flip_prob),
+                    transforms.Normalize([0.5], [0.5]),
+                ]
+            )
+        elif transform_mode == "aspect_ratio":
+            self.image_transorms = lambda img: aspect_ratio_transform(img, resolution[0], resolution[1], flip_prob)
 
         def preprocess_train(examples):
             pixel_values = torch.stack([example["pixel_values"] for example in examples])

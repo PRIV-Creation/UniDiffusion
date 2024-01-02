@@ -19,6 +19,7 @@ class ImageDataset(BaseDataset):
         drop_prob=0.,
         flip_prob=0.,
         prompt_template="a photo of {}",
+        skip_error=True,
     ):
         super().__init__()
         self.tokenizer = tokenizer
@@ -26,6 +27,7 @@ class ImageDataset(BaseDataset):
         self.inversion_placeholder = inversion_placeholder
         self.resolution = resolution
         self.prompt_template = prompt_template
+        self.skip_error = skip_error
 
         images = []
         for ext in ['jpg', 'png']:
@@ -74,31 +76,37 @@ class ImageDataset(BaseDataset):
         return prompt
 
     def __getitem__(self, index):
-        example = {}
-        instance_image = Image.open(self.image_paths[index % self.num_instance_images])
-        if instance_image.mode != 'RGB':
-            instance_image = instance_image.convert('RGB')
+        try:
+            example = {}
+            instance_image = Image.open(self.image_paths[index % self.num_instance_images])
+            if instance_image.mode != 'RGB':
+                instance_image = instance_image.convert('RGB')
 
-        if random.random() < self.drop_prob:
-            prompt = ""
-        else:
-            placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
-            if isinstance(placeholder, list):
-                placeholder = ' '.join(placeholder)
-            prompt = self.prompt_template.format(placeholder)
+            if random.random() < self.drop_prob:
+                prompt = ""
+            else:
+                placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
+                if isinstance(placeholder, list):
+                    placeholder = ' '.join(placeholder)
+                prompt = self.prompt_template.format(placeholder)
 
-        example['file_name'] = self.image_paths[index % self.num_instance_images]
-        example['prompt'] = prompt
-        example["pixel_values"] = self.image_transforms(instance_image)
-        if self.tokenizer is None:
-            example["input_ids"] = torch.tensor([1])
-        else:
-            example["input_ids"] = self.tokenizer(
-                prompt,
-                truncation=True,
-                padding="max_length",
-                max_length=self.tokenizer.model_max_length,
-                return_tensors="pt",
-            ).input_ids
+            example['file_name'] = self.image_paths[index % self.num_instance_images]
+            example['prompt'] = prompt
+            example["pixel_values"] = self.image_transforms(instance_image)
+            if self.tokenizer is None:
+                example["input_ids"] = torch.tensor([1])
+            else:
+                example["input_ids"] = self.tokenizer(
+                    prompt,
+                    truncation=True,
+                    padding="max_length",
+                    max_length=self.tokenizer.model_max_length,
+                    return_tensors="pt",
+                ).input_ids
 
-        return example
+            return example
+        except Exception as e:
+            if self.skip_error:
+                return self.__getitem__(index + 1)
+            else:
+                raise e

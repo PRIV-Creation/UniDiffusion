@@ -29,5 +29,5 @@ class UNet2DConditionModel_NullText(BaseModel, UNet2DConditionModel):
         unet.load_state_dict(torch.load(kwargs["null_text_checkpoint"], map_location=unet.device), strict=False)
         if unet.trainable:
             unet.parse_training_args(proxy_model)
-        setup_logger(__name__).info('Model {} trainable: {}.'.format(cls.model_name, cls.trainable))
+        setup_logger(__name__).info('Model {} trainable: {}.'.format(unet.model_name, unet.trainable))
         return unet

@@ -10,7 +10,7 @@ def aspect_ratio_transform(image, target_height, target_width, flip_prob):
 
     # 创建transform
     transform = transforms.Compose([
-        transforms.CenterCrop((h, w)),
+        transforms.CenterCrop((h, crop_width)),
         transforms.RandomHorizontalFlip(p=flip_prob),
         transforms.Resize((target_height, target_width)),
     ])

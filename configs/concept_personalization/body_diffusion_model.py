@@ -13,6 +13,7 @@ train.use_ema = True
 optimizer.optimizer = '8bit_adam'
 optimizer.lr = 1e-5
 
+train.resolution = (768, 512)
 dataset.path = "datasets/body/"
 train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 

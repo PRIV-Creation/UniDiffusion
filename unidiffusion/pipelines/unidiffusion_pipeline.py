@@ -678,6 +678,8 @@ class UniDiffusionPipeline:
                             generator=generator,
                             output_type='pt',
                             guidance_scale=guidance_scale,
+                            height=self.cfg.inference.resolution[0],
+                            width=self.cfg.inference.resolution[1],
                             **self.cfg.inference.forward_kwargs
                         ).images[0]
                         progress_bar.update(1)
@@ -821,6 +823,8 @@ class UniDiffusionPipeline:
                         generator=generator,
                         output_type='pt',
                         guidance_scale=guidance_scale,
+                        height=self.cfg.evaluation.resolution[0],
+                        width=self.cfg.evaluation.resolution[1],
                         **self.cfg.evaluation.forward_kwargs
                     ).images[0]
                     progress_bar.update(1)
@@ -851,6 +855,8 @@ class UniDiffusionPipeline:
                             generator=generator,
                             output_type='pt',
                             guidance_scale=guidance_scale,
+                            height=self.cfg.evaluation.resolution[0],
+                            width=self.cfg.evaluation.resolution[1],
                             **self.cfg.evaluation.forward_kwargs
                         ).images[0]
 

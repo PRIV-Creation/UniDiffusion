@@ -45,6 +45,7 @@ inference_pipeline = L(StableDiffusionPipeline.from_pretrained)(
 inference = {
     'save_path': None,
     'skip_error': False,
+    'resolution': '${train.resolution}',
     'inference_iter': 5000,
     'rectify_uncond': False,
     'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
@@ -61,6 +62,7 @@ inference = {
 evaluation = {
     'evaluation_iter': 10000,
     'skip_error': False,
+    'resolution': '${train.resolution}',
     'total_num': 1000,  # synthesis images num
     'rectify_uncond': False,
     # 'batch_size': 1,    # not used

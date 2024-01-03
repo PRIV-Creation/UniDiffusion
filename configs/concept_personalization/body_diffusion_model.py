@@ -1,6 +1,6 @@
 from configs.common.get_common_config import *
 from unidiffusion.config import LazyCall as L
-from unidiffusion.models import UNet2DConditionModel_NullText
+from unidiffusion.models import UNet2DConditionModel_UniDiffusion
 from unidiffusion.models import StableDiffusionRectifyPipeline
 from unidiffusion.config import LazyCall as L
 from unidiffusion.datasets import ExcelDataset
@@ -56,10 +56,14 @@ inference_pipeline = L(StableDiffusionRectifyPipeline.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
 )
 
-unet = L(UNet2DConditionModel_NullText.from_pretrained)(
-    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
+unet_init = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
+    pretrained_model_name_or_path="epicphotogasm_lastUnicorn",
     subfolder='unet',
-    null_text_checkpoint="stable-diffusion-v1-5_null-text.pt",
+)
+
+unet = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
+    pretrained_model_name_or_path="epicphotogasm_lastUnicorn",
+    subfolder='unet',
     training_args = {
         r'': {
             'mode': 'finetune',

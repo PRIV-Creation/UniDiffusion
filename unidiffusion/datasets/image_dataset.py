@@ -41,6 +41,7 @@ class ImageDataset(BaseDataset):
 
         self._length = self.num_instance_images
 
+        # data preprocessing
         if transform_mode == "resize_only":
             self.image_transforms = transforms.Compose(
                 [
@@ -73,7 +74,7 @@ class ImageDataset(BaseDataset):
     def __len__(self):
         return self._length
 
-    def get_prompt(self, item):
+    def get_prompt(self, index):
         placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
         if isinstance(placeholder, list):
             placeholder = ' '.join(placeholder)
@@ -90,10 +91,7 @@ class ImageDataset(BaseDataset):
             if random.random() < self.drop_prob:
                 prompt = ""
             else:
-                placeholder = self.inversion_placeholder if self.inversion_placeholder is not None else self.placeholder
-                if isinstance(placeholder, list):
-                    placeholder = ' '.join(placeholder)
-                prompt = self.prompt_template.format(placeholder)
+                prompt = self.get_prompt(index)
 
             example['file_name'] = self.image_paths[index % self.num_instance_images]
             example['prompt'] = prompt

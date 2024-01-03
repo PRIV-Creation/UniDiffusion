@@ -3,9 +3,17 @@ from unidiffusion.config import LazyCall as L
 from unidiffusion.models import UNet2DConditionModel_NullText
 from unidiffusion.models import StableDiffusionRectifyPipeline
 from unidiffusion.config import LazyCall as L
+from unidiffusion.datasets import ExcelDataset
 
 
-dataset = get_config("common/data/image_dataset.py").dataset
+dataset = L(ExcelDataset)(
+    path=None,
+    placeholder=None,
+    inversion_placeholder=None,
+    excel_path="datasets/body/sku_title.xlsx",
+    resolution='${train.resolution}',
+    prompt_template="a photo of {}"
+)
 
 train.project = "UniDiffusion-Body"
 train.gradient_checkpointing = False

@@ -237,12 +237,14 @@ class UniDiffusionPipeline:
             self.lr_scheduler = self.accelerator.prepare(self.lr_scheduler)
 
     def build_evaluator(self):
-        self.logger.info("Building evaluator ... ")
-        for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
-            if evaluator_args.get('enabled'):
-                self.evaluators.append(EVALUATOR[evaluator](**evaluator_args).to(self.accelerator.device))
-                self.logger.info(f'Build {evaluator} evaluator.')
-        # _ = [evaluator.to(self.accelerator.device) for evaluator in self.evaluators]
+        if self.cfg.evaluation.evaluation_iter == 0:
+            self.logger.info("Not evaluation during training ... ")
+        else:
+            self.logger.info("Building evaluator ... ")
+            for evaluator, evaluator_args in self.cfg.evaluation.evaluator.items():
+                if evaluator_args.get('enabled'):
+                    self.evaluators.append(EVALUATOR[evaluator](**evaluator_args).to(self.accelerator.device))
+                    self.logger.info(f'Build {evaluator} evaluator.')
 
     def prepare_null_text(self):
         if not self.cfg.train.null_text:

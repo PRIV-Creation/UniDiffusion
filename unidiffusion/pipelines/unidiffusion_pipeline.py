@@ -147,10 +147,7 @@ class UniDiffusionPipeline:
         # build origin unet
         self.rectify_uncond = (self.cfg.inference.rectify_uncond or self.cfg.evaluation.rectify_uncond)
         if self.rectify_uncond:
-            self.unet_init = UNet2DConditionModel.from_pretrained(
-                pretrained_model_name_or_path=self.cfg.train.pretrained_model_name_or_path,
-                subfolder="unet",
-            )
+            self.unet_init = instantiate(self.cfg.unet_init)
 
         self.models = [self.vae, self.text_encoder, self.unet]
 

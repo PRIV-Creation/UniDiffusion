@@ -52,7 +52,7 @@ class ImageDataset(BaseDataset):
                 ]
             )
         elif transform_mode == "aspect_ratio":
-            self.image_transorms = lambda img: aspect_ratio_transform(img, resolution[0], resolution[1], flip_prob)
+            self.image_transforms = lambda img: aspect_ratio_transform(img, resolution[0], resolution[1], flip_prob)
 
         def preprocess_train(examples):
             pixel_values = torch.stack([example["pixel_values"] for example in examples])

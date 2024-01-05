@@ -35,7 +35,7 @@ dataloader.batch_size = 16
 train.gradient_accumulation_iter = 1
 
 # Inference
-inference.inference_iter = 200
+inference.inference_iter = 5000
 inference.rectify_uncond = True
 inference.guidance_scale = [1.5 + 1 * i for i in range(7)]
 inference.total_num = 20
@@ -57,14 +57,14 @@ inference_pipeline = L(StableDiffusionRectifyPipeline.from_pretrained)(
 )
 
 unet_init = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
-    pretrained_model_name_or_path="epicphotogasm_lastUnicorn",
+    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder='unet',
 )
 
 unet = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
-    pretrained_model_name_or_path="epicphotogasm_lastUnicorn",
+    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
     subfolder='unet',
-    training_args = {
+    training_args={
         r'': {
             'mode': 'finetune',
             # 'module_kwargs': {'scale': 1.0, 'rank': 4},

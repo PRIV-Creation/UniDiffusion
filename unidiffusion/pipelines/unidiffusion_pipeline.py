@@ -493,6 +493,11 @@ class UniDiffusionPipeline:
 
                     # Sample noise that we'll add to the latents
                     noise = torch.randn_like(latents)
+                    if self.cfg.train.noise_offset.enabled:
+                        # https://www.crosslabs.org//blog/diffusion-with-offset-noise
+                        noise += self.cfg.train.noise_offset.scale * torch.randn(
+                            (latents.shape[0], latents.shape[1], 1, 1), device=latents.device
+                        )
                     bsz = latents.shape[0]
                     # Sample a random timestep for each image
                     timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device)

@@ -74,7 +74,6 @@ class ExcelDataset(ImageDataset):
         self.prompt_dict = prompt_dict
 
     def get_prompt(self, index):
-        return "a woman"
         image_path = self.image_paths[index % self.num_instance_images]
         info = image_path.split('/')
         try:

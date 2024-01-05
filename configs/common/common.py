@@ -29,6 +29,8 @@ train = {
     'comet_ml': {'enabled': False},
     # training mechanisms
     'snr': {'enabled': False, 'snr_gamma': 5.0},
+    # noise offset
+    'noise_offset': {'enabled': False, 'scale': 1.0},
     # Null-text Mode
     "null_text": False,
 }

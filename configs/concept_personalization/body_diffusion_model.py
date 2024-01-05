@@ -1,5 +1,4 @@
 from configs.common.get_common_config import *
-from unidiffusion.config import LazyCall as L
 from unidiffusion.models import UNet2DConditionModel_UniDiffusion
 from unidiffusion.models import StableDiffusionRectifyPipeline
 from unidiffusion.config import LazyCall as L

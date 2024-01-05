@@ -31,7 +31,7 @@ def snr_loss(snr_gamma, timesteps, noise_scheduler, model_pred, target):
     # Compute loss-weights as per Section 3.4 of https://arxiv.org/abs/2303.09556.
     # Since we predict the noise instead of x_0, the original formulation is slightly changed.
     # This is discussed in Section 4.2 of the same paper.
-    snr = compute_snr(timesteps)
+    snr = compute_snr(timesteps, noise_scheduler)
     mse_loss_weights = (
             torch.stack([snr, snr_gamma * torch.ones_like(timesteps)], dim=1).min(dim=1)[0] / snr
     )

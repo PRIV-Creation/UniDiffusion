@@ -12,7 +12,7 @@ dataset = L(ExcelDataset)(
     inversion_placeholder=None,
     excel_path="datasets/body/sku_title.xlsx",
     resolution='${train.resolution}',
-    prompt_template="a photo of {}"
+    transform_mode="aspect_ratio"
 )
 
 train.project = "UniDiffusion-Body"
@@ -35,9 +35,9 @@ dataloader.batch_size = 16
 train.gradient_accumulation_iter = 1
 
 # Inference
-inference.inference_iter = 2000
+inference.inference_iter = 200
 inference.rectify_uncond = True
-inference.guidance_scale = [1.5 + 1 * i for i in range(5)]
+inference.guidance_scale = [1.5 + 1 * i for i in range(7)]
 inference.total_num = 20
 
 # Evaluation
@@ -48,7 +48,7 @@ evaluation.evaluator.fid.real_image_num = 1000
 evaluation.total_num = 1000
 evaluation.guidance_scale = [1.5 + 0.25 * i for i in range(5)]
 
-train.output_dir = 'experiments/body/body_lora_bs32_1e-5_768-512_fromepic'
+train.output_dir = 'experiments/body/body_finetune_bs32_1e-5_768-512_fromepic'
 train.max_iter = 1000000
 train.wandb.enabled = True
 
@@ -65,9 +65,9 @@ unet = L(UNet2DConditionModel_UniDiffusion.from_pretrained)(
     pretrained_model_name_or_path="epicphotogasm_lastUnicorn",
     subfolder='unet',
     training_args = {
-        r'attn2\.(to_k|to_v)': {
-            'mode': 'lora',
-            'module_kwargs': {'scale': 1.0, 'rank': 4},
+        r'': {
+            'mode': 'finetune',
+            # 'module_kwargs': {'scale': 1.0, 'rank': 4},
             'optim_kwargs': {'lr': '${optimizer.lr}'},
         },
     }

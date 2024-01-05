@@ -5,7 +5,7 @@ import random
 from PIL import Image
 
 
-no_background_prompts = [
+prompts = [
     "A female model elegantly wearing a {clothing_item}.",
     "A close-up of a woman dressed in a {clothing_item}.",
     "A stylish woman showcasing a {clothing_item}.",

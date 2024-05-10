@@ -15,7 +15,7 @@ train = {
     'gradient_checkpointing': False,
     'resume': None,  # "latest" or checkpoint path
     'use_ema': True,
-    'resolution': 512,
+    'resolution': (512, 512),
     # pipelines configs
     'max_iter': 100000,
     'max_grad_norm': 1.0,

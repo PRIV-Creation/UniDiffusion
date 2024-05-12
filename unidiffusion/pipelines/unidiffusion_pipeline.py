@@ -90,6 +90,8 @@ class UniDiffusionPipeline:
                 self.cfg.train.wandb.id = self.accelerator.get_tracker("wandb").tracker.id
                 wandb.define_metric("inference/step")
                 wandb.define_metric("inference/*", step_metric="inference/step")
+        elif self.mode == 'export':
+            pass
         else:
             self.accelerator.init_trackers(self.cfg.train.project)
 

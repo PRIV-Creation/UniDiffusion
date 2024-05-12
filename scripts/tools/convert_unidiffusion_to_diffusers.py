@@ -1,10 +1,10 @@
 import os
-from unidiffusion.pipelines import UniDiffusionInferencePipeline
+from unidiffusion.pipelines import UniDiffusionExportPipeline
 from unidiffusion.config import LazyConfig, default_argument_parser
 
 
 def main(cfg, save_path):
-    trainer = UniDiffusionInferencePipeline(cfg)
+    trainer = UniDiffusionExportPipeline(cfg)
     trainer.save_diffusers(save_path)
 
 

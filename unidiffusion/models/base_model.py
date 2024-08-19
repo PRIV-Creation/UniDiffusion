@@ -11,7 +11,12 @@ class BaseModel:
 
     @classmethod
     def from_pretrained(cls, proxy_model=None, training_args=None, *args, **kwargs):
-        model = super().from_pretrained(*args, **kwargs)
+        #################################################################################
+        ### model = super().from_pretrained(*args, **kwargs) 
+        ### 调用unet2dcondition里继承的ModelMixin的装饰器包过的from_pretrained,太复杂没懂
+        ### 但返回的是UNet2DConditionModel_UniDiffusion即models里面的类
+        #################################################################################
+        model = super().from_pretrained(*args, **kwargs) 
         model.trainable = training_args is not None
         model.params_train_args = training_args
         if model.trainable:

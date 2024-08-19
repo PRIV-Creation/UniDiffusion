@@ -1,7 +1,7 @@
 from accelerate import Accelerator
 from accelerate.utils import ProjectConfiguration
 from unidiffusion.config import LazyCall as L
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler,StableDiffusionXLPipeline
 
 
 train = {
@@ -15,7 +15,7 @@ train = {
     'gradient_checkpointing': False,
     'resume': None,  # "latest" or checkpoint path
     'use_ema': True,
-    'resolution': (512, 512),
+    'resolution': (256, 256),
     # pipelines configs
     'max_iter': 100000,
     'max_grad_norm': 1.0,
@@ -44,14 +44,18 @@ inference_pipeline = L(StableDiffusionPipeline.from_pretrained)(
     pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
 )
 
+inference_pipeline_sdxl = L(StableDiffusionXLPipeline.from_pretrained)(
+    pretrained_model_name_or_path="${..train.pretrained_model_name_or_path}",
+)
+
 inference = {
     'save_path': None,
     'skip_error': False,
     'resolution': '${train.resolution}',
-    'inference_iter': 5000,
+    'inference_iter': 1000,
     'rectify_uncond': False,
-    'prompts': None,    # string or prompt file path. Using randomly selected dataset prompts if None.
-    'total_num': 10,
+    'prompts': "Trump gives a speech",    # string or prompt file path. Using randomly selected dataset prompts if None.
+    'total_num': 4,
     'scheduler': L(DPMSolverMultistepScheduler.from_config)(),
     'guidance_scale': 7.5,
     'forward_kwargs': {
@@ -62,10 +66,10 @@ inference = {
 }
 
 evaluation = {
-    'evaluation_iter': 10000,
+    'evaluation_iter': 2000,
     'skip_error': False,
     'resolution': '${train.resolution}',
-    'total_num': 1000,  # synthesis images num
+    'total_num': 4,  # synthesis images num
     'rectify_uncond': False,
     # 'batch_size': 1,    # not used
     'prompts': None,    # using dataset prompt if None

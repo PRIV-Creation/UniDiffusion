@@ -1,4 +1,4 @@
-from .text_encoder import CLIPTextModel_UniDiffusion
+from .text_encoder import CLIPTextModel_UniDiffusion,CLIPTextModelWithProjection_UniDiffusion
 from .unet import UNet2DConditionModel_UniDiffusion
 from .vae import AutoencoderKL_UniDiffusion
 from .tokenizer import CLIPTokenizer_UniDiffusion

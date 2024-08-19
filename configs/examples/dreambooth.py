@@ -11,8 +11,9 @@ train.pretrained_model_name_or_path = 'runwayml/stable-diffusion-v1-5'
 
 # set mode to 'lora' to enabled dreambooth_lora
 unet.training_args = {
-    '': {
-        'mode': 'finetune',
+    r'attn2\.(to_k|to_v)': {
+        'mode': 'lora',
+        'module_kwargs': {'scale': 1.0, 'rank': 4},
         'optim_kwargs': {'lr': '${optimizer.lr}'}
     }
 }

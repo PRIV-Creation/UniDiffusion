@@ -2,3 +2,4 @@ from .evaluation_pipeline import UniDiffusionEvaluationPipeline
 from .inference_pipeline import UniDiffusionInferencePipeline
 from .training_pipeline import UniDiffusionTrainingPipeline
 from .export_pipeline import UniDiffusionExportPipeline
+from .sdxl_training_pipeline import SDXL_UniDiffusionTrainingPipeline

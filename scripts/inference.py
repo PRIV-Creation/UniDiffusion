@@ -1,11 +1,20 @@
+from pathlib import Path
+import sys
 import os
-from unidiffusion.pipelines import UniDiffusionInferencePipeline
-from unidiffusion.config import LazyConfig, default_argument_parser
-
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[1]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 def main(cfg):
     trainer = UniDiffusionInferencePipeline(cfg)
     trainer.inference()
+
+import os
+from unidiffusion.pipelines import UniDiffusionInferencePipeline
+from unidiffusion.config import LazyConfig, default_argument_parser
+
 
 
 if __name__ == '__main__':

@@ -3,6 +3,22 @@ from .base_model import BaseModel
 from transformers import CLIPTextModel,CLIPTextModelWithProjection
 
 
+class MultiTextModel(BaseModel):
+    model_name = 'text_encoder'
+    start_token_idx = None
+    end_token_idx = None
+
+    def __init__(self, text_encoders):
+        self.text_encoders = text_encoders
+
+    def forward(self, *args, **kwargs):
+        results = []
+        for text_encoder in self.text_encoders:
+            results.append(text_encoder(*args, **kwargs))
+        return torch.cat(results, dim=1)    # TODO: check concat dimension
+
+
+
 class CLIPTextModel_UniDiffusion(BaseModel, CLIPTextModel):
     model_name = 'text_encoder'
     start_token_idx = None
